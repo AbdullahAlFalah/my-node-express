@@ -2,6 +2,7 @@ const express = require('express');
 const mysql = require('mysql2');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+
 const pgsql = require('./DifferentDatabases/postgreSQL');
 
 const app = express();
@@ -13,14 +14,15 @@ app.use(bodyParser.json());
 app.use(cors()); // Enable CORS for all routes
 
 // MySQL Connection
+require('dotenv').config();
 const fs = require('fs');
 const db = mysql.createConnection({
-  host: 'mysql-125eea42-salem908mk-1066.l.aivencloud.com',
-  user: 'avnadmin',
-  password: 'AVNS_2b8kGbPM5zsLnfLD87n',
-  database: 'defaultdb',
-  port: '11746',
-  ssl: { ca: fs.readFileSync('./ca.pem') }, //path to Aiven's CA certificate
+  host: process.env.MYSQL_HOST,
+  user: process.env.MYSQL_USER,
+  password: process.env.MYSQL_PASSWORD,
+  database: process.env.MYSQL_DATABASE,
+  port: parseInt(process.env.MYSQL_PORT, 10),
+  ssl: { ca: fs.readFileSync(process.env.MYSQL_SSL_CA) }, //path to Aiven's CA certificate
   connectTimeout: 10000
 });
 
@@ -33,7 +35,28 @@ db.connect((err) => {
   console.log('Connected to MySQL as ID ' + db.threadId);
 });
 
-// Routes:
+// Connect to PostgreSQL
+pgsql.connect((err, client) => {
+
+  if (err) {
+    console.error('Error connecting to PostgreSQL: ' + err.stack);
+    return;
+  }
+
+  // Get the process ID for the current PostgreSQL connection
+  client.query('SELECT pg_backend_pid()', (err, result) => {
+    /* release(); // Release the client back to the pool */
+    if (err) {
+      console.error('Error getting current query: ' + err.stack);
+      return;
+    }
+    const pgConnectionId = result.rows[0].pg_backend_pid;
+    console.log('Connected to PostgreSQL as PID ' + pgConnectionId);
+  });
+
+});
+
+// MySQL Routes:
 // Get all users route
 app.get('/api/users', (req, res) => {
   db.query('SELECT * FROM users', (err, results) => {
