@@ -89,7 +89,7 @@ app.post('/api/users/login', (req, res) => {
       return res.status(401).json({ServerNote: 'Invalid password!'});
     }
 
-    res.status(200).json({ message: 'Login successful', userId: user.idUsers }); //200 OK: The request succeeded, and the server is returning the requested resource.
+    res.status(200).json({ ServerNote: 'Login successful', userId: user.idUsers }); //200 OK: The request succeeded, and the server is returning the requested resource.
   });
 });
 
