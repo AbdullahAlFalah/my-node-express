@@ -57,20 +57,8 @@ pgsql.connect((err, client) => {
 });
 
 // MySQL Routes:
-// Get all users route
-app.get('/api/users', (req, res) => {
-  db.query('SELECT * FROM users', (err, results) => {
-    if (err) {
-      console.error('Error executing query: ' + err.stack);
-      res.status(500).send('Error fetching users');
-      return;
-    }
-    res.json(results);
-  });
-});
-
 // Create a new user route (Signing-up)
-app.post('/api/users', (req, res) => {
+app.post('/api/users/signup', (req, res) => {
   const { username, email, password } = req.body;
   db.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, password], (err, result) => {
     if (err) {
@@ -78,34 +66,71 @@ app.post('/api/users', (req, res) => {
       res.status(400).json({ServerNote: 'Error creating user'});
       return;
     }
-    res.status(201).json({ServerNote: 'User created successfully'});
+    res.status(201).json({ServerNote: 'User created successfully'}); //201 Created: The request has succeeded, and a new resource was created, often used for successful POST requests.
+  });
+});
+
+// Login with an existing user route (Signing-in)
+app.post('/api/users/login', (req, res) => {
+  const { email, password } = req.body;
+  db.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
+    if (err) {
+      console.error('Error executing query: ' + err.stack);
+      return res.status(500).json({ServerNote: 'Server connection error!!'});
+    }
+
+    if (results.length === 0) {
+      return res.status(401).json({ServerNote: 'User not found!'});
+    }
+
+    const user = results[0];
+    
+    if (user.password !== password) {
+      return res.status(401).json({ServerNote: 'Invalid password!'});
+    }
+
+    res.status(200).json({ message: 'Login successful', userId: user.idUsers }); //200 OK: The request succeeded, and the server is returning the requested resource.
+  });
+});
+
+// Get all user info based on email route
+app.get('/api/users/getuserinfo', (req, res) => {
+  const email = req.body;
+  db.query('SELECT * FROM users WHERE email = ?', email, (err, results) => {
+    if (err) {
+      console.error('Error executing query: ' + err.stack);
+      res.status(400).json({ServerNote: 'Error fetching user info!'});
+      return;
+    }
+    res.status(200).json({ServerNote: 'User info fetched!!!'}); 
+    res.json(results);
   });
 });
 
 // Update an existing user route 
-app.put('/api/users/:id', (req, res) => {
+app.put('/api/users/updateuserinfo:id', (req, res) => {
   const { username, email } = req.body;
   const userId = req.params.id;
   db.query('UPDATE users SET username = ?, email = ? WHERE id = ?', [username, email, userId], (err, result) => {
     if (err) {
       console.error('Error executing query: ' + err.stack);
-      res.status(400).send('Error updating user');
+      res.status(400).json({ServerNote: 'Error updating user!'});
       return;
     }
-    res.send('User updated successfully');
+    res.status(204).json({ServerNote: 'User updated successfully!!!'}); //204 No Content: The request was successful, but there's no content to return. Useful for actions like updates where no response body is needed.
   });
 });
 
 // Delete a user route
-app.delete('/api/users/:id', (req, res) => {
+app.delete('/api/users/deleteuserinfo:id', (req, res) => {
   const userId = req.params.id;
   db.query('DELETE FROM users WHERE id = ?', [userId], (err, result) => {
     if (err) {
       console.error('Error executing query: ' + err.stack);
-      res.status(400).send('Error deleting user');
+      res.status(400).json({ServerNote: 'Error deleting user!'});
       return;
     }
-    res.send('User deleted successfully');
+    res.status(204).json({ServerNote: 'User deleted successfully!!!'});
   });
 });
 
