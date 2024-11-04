@@ -89,12 +89,12 @@ app.post('/api/users/login', (req, res) => {
       return res.status(401).json({ServerNote: 'Invalid password!'});
     }
 
-    res.status(200).json({ ServerNote: 'Login successful', userId: user.idUsers }); //200 OK: The request succeeded, and the server is returning the requested resource.
+    res.status(200).json({ ServerNote: 'Logging-in has been successful', userId: user.idUsers }); //200 OK: The request succeeded, and the server is returning the requested resource.
   });
 });
 
 // Get all user info based on email route
-app.get('/api/users/getuserinfo', (req, res) => {
+app.post('/api/users/getuserinfo', (req, res) => {
   const email = req.body;
   db.query('SELECT * FROM users WHERE email = ?', email, (err, results) => {
     if (err) {
