@@ -58,7 +58,7 @@ pgsql.connect((err, client) => {
 
 // MySQL Routes:
 // Create a new user route (Signing-up)
-app.post('/api/users/signup', (req, res) => {
+app.post(`/api/users/signup`, (req, res) => {
   const { username, email, password } = req.body;
   db.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, password], (err, result) => {
     if (err) {
@@ -71,7 +71,7 @@ app.post('/api/users/signup', (req, res) => {
 });
 
 // Login with an existing user route (Signing-in)
-app.post('/api/users/login', (req, res) => {
+app.post(`/api/users/login`, (req, res) => {
   const { email, password } = req.body;
   db.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
     if (err) {
@@ -88,27 +88,27 @@ app.post('/api/users/login', (req, res) => {
     if (user.password !== password) {
       return res.status(401).json({ServerNote: 'Invalid password!'});
     }
-
     res.status(200).json({ ServerNote: 'Logging-in has been successful', userId: user.idUsers }); //200 OK: The request succeeded, and the server is returning the requested resource.
   });
 });
 
 // Get all user info based on email route
-app.post('/api/users/getuserinfo', (req, res) => {
-  const email = req.body;
+app.get(`/api/users/getuserinfo`, (req, res) => {
+  const email = req.query.email; // Access email from the query parameters
   db.query('SELECT * FROM users WHERE email = ?', email, (err, results) => {
     if (err) {
       console.error('Error executing query: ' + err.stack);
       res.status(400).json({ServerNote: 'Error fetching user info!'});
       return;
     }
-    res.status(200).json({ServerNote: 'User info fetched!!!'}); 
-    res.json(results);
+    res.status(200).json({ServerNote: 'User info fetched!!!',
+      data: results,
+    });  
   });
 });
 
 // Update an existing user route 
-app.put('/api/users/updateuserinfo:id', (req, res) => {
+app.put(`/api/users/updateuserinfo:id`, (req, res) => {
   const { username, email } = req.body;
   const userId = req.params.id;
   db.query('UPDATE users SET username = ?, email = ? WHERE id = ?', [username, email, userId], (err, result) => {
@@ -122,7 +122,7 @@ app.put('/api/users/updateuserinfo:id', (req, res) => {
 });
 
 // Delete a user route
-app.delete('/api/users/deleteuserinfo:id', (req, res) => {
+app.delete(`/api/users/deleteuserinfo:id`, (req, res) => {
   const userId = req.params.id;
   db.query('DELETE FROM users WHERE id = ?', [userId], (err, result) => {
     if (err) {
