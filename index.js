@@ -13,12 +13,16 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cors()); // Enable CORS for all routes
 
+let outer_mysqlclient;
+let outer_pgclient;
+
 // Connect to MySQL
 mysqlpool.getConnection((err, mysqlclient) => {
   if (err) {
     console.error('Error connecting to MySQL: ' + err.stack);
     return;
   }
+  outer_mysqlclient = mysqlclient;
   console.log('Connected to MySQL as ID ' + mysqlclient.threadId);
 });
 
@@ -29,6 +33,8 @@ pgsqlpool.connect((err, pgclient) => {
     console.error('Error connecting to PostgreSQL: ' + err.stack);
     return;
   }
+
+  outer_pgclient = pgclient;
 
   // Get the process ID for the current PostgreSQL connection
   pgclient.query('SELECT pg_backend_pid()', (err, result) => {
@@ -47,7 +53,7 @@ pgsqlpool.connect((err, pgclient) => {
 // Create a new user route (Signing-up)
 app.post(`/api/users/signup`, (req, res) => {
   const { username, email, password } = req.body;
-  mysqlclient.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, password], (err, result) => {
+  outer_mysqlclient.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, password], (err, result) => {
     if (err) {
       console.error('Error executing query: ' + err.stack);
       res.status(400).json({ServerNote: 'Error creating user'});
@@ -60,7 +66,7 @@ app.post(`/api/users/signup`, (req, res) => {
 // Login with an existing user route (Signing-in)
 app.post(`/api/users/login`, (req, res) => {
   const { email, password } = req.body;
-  mysqlclient.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
+  outer_mysqlclient.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
     if (err) {
       console.error('Error executing query: ' + err.stack);
       return res.status(500).json({ServerNote: 'Server connection error!!'});
@@ -82,7 +88,7 @@ app.post(`/api/users/login`, (req, res) => {
 // Get all user info based on email route
 app.get(`/api/users/getuserinfo`, (req, res) => {
   const email = req.query.email; // Access email from the query parameters
-  mysqlclient.query('SELECT * FROM users WHERE email = ?', email, (err, results) => {
+  outer_mysqlclient.query('SELECT * FROM users WHERE email = ?', email, (err, results) => {
     if (err) {
       console.error('Error executing query: ' + err.stack);
       res.status(400).json({ServerNote: 'Error fetching user info!'});
@@ -98,7 +104,7 @@ app.get(`/api/users/getuserinfo`, (req, res) => {
 app.put(`/api/users/updateuserinfo:id`, (req, res) => {
   const { username, email } = req.body;
   const userId = req.params.id;
-  mysqlclient.query('UPDATE users SET username = ?, email = ? WHERE id = ?', [username, email, userId], (err, result) => {
+  outer_mysqlclient.query('UPDATE users SET username = ?, email = ? WHERE id = ?', [username, email, userId], (err, result) => {
     if (err) {
       console.error('Error executing query: ' + err.stack);
       res.status(400).json({ServerNote: 'Error updating user!'});
@@ -111,7 +117,7 @@ app.put(`/api/users/updateuserinfo:id`, (req, res) => {
 // Delete a user route
 app.delete(`/api/users/deleteuserinfo:id`, (req, res) => {
   const userId = req.params.id;
-  mysqlclient.query('DELETE FROM users WHERE id = ?', [userId], (err, result) => {
+  outer_mysqlclient.query('DELETE FROM users WHERE id = ?', [userId], (err, result) => {
     if (err) {
       console.error('Error executing query: ' + err.stack);
       res.status(400).json({ServerNote: 'Error deleting user!'});
