@@ -100,6 +100,46 @@ app.get(`/api/users/getuserinfo`, (req, res) => {
   });
 });
 
+// Reset a user's password route based on userId
+app.put(`/api/users/resetpassword/:id`, (req, res) => {
+  const userId = req.params.id;
+  const { oldPassword, newPassword } = req.body;
+
+  if (!oldPassword || !newPassword) { // Check if old and new passwords are provided
+    return res.status(400).json({ ServerNote: 'Old and new passwords are required!' });
+  }
+
+  // First, get the user's current password
+  outer_mysqlclient.query('SELECT password FROM users WHERE idUsers = ?', [userId], (err, result) => {
+    if (err) {
+      console.error('Error fetching old password: ' + err.stack);
+      return res.status(500).json({ ServerNote: 'Server error fetching old password!' });
+    }
+
+    if (result.length === 0) {
+      return res.status(404).json({ ServerNote: 'User not found!' });
+    }
+
+    const storedPassword = result[0].password;
+
+    // Check if the old password matches
+    if (storedPassword !== oldPassword) {
+      return res.status(401).json({ ServerNote: 'Incorrect old password!' });
+    }
+    // If the old password matches, update to the new password
+    outer_mysqlclient.query('UPDATE users SET password = ? WHERE idUsers = ?', [newPassword, userId], (err, result) => {
+      if (err) {
+        console.error('Error executing query: ' + err.stack);
+        res.status(400).json({ ServerNote: 'Error resetting password!' });
+        return;
+      }
+      res.status(200).json({ ServerNote: 'Password reset successfully!' });
+    });
+
+  });
+
+});
+
 // Update an existing user route 
 app.put(`/api/users/updateuserinfo:id`, (req, res) => {
   const { username, email } = req.body;
