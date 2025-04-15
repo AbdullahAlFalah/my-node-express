@@ -208,6 +208,56 @@ app.delete(`/api/users/deleteuserinfo/:id`, (req, res) => {
   });
 });
 
+// PostgreSQL Routes:
+// Get all films info route
+app.get(`/api/films/getfilmsinfo`, authenticateToken, (res) => {
+  const query = `SELECT film_id, title, description, length, replacement_cost, rating FROM film`;
+
+  outer_pgclient.query(query, (err, result) => {
+    if (err) {
+      console.error('Error executing query: ' + err.stack);
+      return res.status(500).json({ ServerNote: 'Error fetching films!' });
+    }
+
+    res.status(200).json({
+      ServerNote: 'Films fetched successfully!',
+      data: result.rows, // Return the rows from the query result
+    });
+
+  });
+});
+
+// Route to fetch actors related to a specific film
+app.get(`/api/films/:film_id/actors`, authenticateToken, (req, res) => {
+  const filmId = req.params.film_id; // Get the film_id from the route parameter
+
+  const query = `
+    SELECT 
+      a.actor_id, 
+      a.first_name, 
+      a.last_name
+    FROM 
+      actor a
+    INNER JOIN 
+      film_actor fa ON a.actor_id = fa.actor_id
+    WHERE 
+      fa.film_id = $1
+  `;
+
+  outer_pgclient.query(query, [filmId], (err, result) => {
+    if (err) {
+      console.error('Error executing query: ' + err.stack);
+      return res.status(500).json({ ServerNote: 'Error fetching actors for the film!' });
+    }
+
+    res.status(200).json({
+      ServerNote: 'Actors fetched successfully!',
+      data: result.rows, // Return the rows from the query result
+    });
+    
+  });
+});
+
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
