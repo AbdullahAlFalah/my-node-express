@@ -210,8 +210,8 @@ app.delete(`/api/users/deleteuserinfo/:id`, (req, res) => {
 
 // PostgreSQL Routes:
 // Get all films info route
-app.get(`/api/films/getfilmsinfo`, authenticateToken, (res) => {
-  const query = `SELECT film_id, title, description, length, replacement_cost, rating FROM film`;
+app.get(`/api/films/getfilmsinfo`, authenticateToken, (req, res) => {
+  const query = `SELECT film_id, title, description, length, replacement_cost, rating FROM film LIMIT 10`;
 
   outer_pgclient.query(query, (err, result) => {
     if (err) {
