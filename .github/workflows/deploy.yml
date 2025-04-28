@@ -20,9 +20,55 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          cd my-node-express
-          git pull origin new-main
-          npm install
+          set -e # ❗ Exit on error: Aborts if any command fails to prevent half-broken deployments.
+          
+          # === 🛡️ Backup the current version ===
+          BACKUP_DIR=~/my-node-express-backups
+          TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+          mkdir -p $BACKUP_DIR
+          cp -r ~/my-node-express $BACKUP_DIR/my-node-express_$TIMESTAMP
+          echo "✅ Backup created at $BACKUP_DIR/my-node-express_$TIMESTAMP"
+
+          # === 🚀 Pull and deply new version ===
+          echo "🚀 Pulling latest code..."
+          cd ~/my-node-express 
+          git fetch --all
+          git reset --hard origin/new-main
+          echo "📦 Installing dependencies..."
+          rm -rf node_modules package-lock.json # ❗ Clean Windows-compatible modules
+          npm install --production # ❗ Reinstall fresh Linux-compatible dependencies
+
+          # === 🔥 Run the server using pm2 ===
+          echo "🔄 Reloading server with PM2..."
           pm2 reload my-api-server || pm2 start index.js --name "my-api-server"
-          pm2 logs my-api-server --lines 100
+          
+          echo "🩺 Health checking server..."
+          sleep 5 # wait for server to properly start
+          
+          # My own server's healthcheck endpoint
+          HEALTHCHECK_URL="http://52.59.130.11:3000/health"
+
+          if curl --fail --silent $HEALTHCHECK_URL; then
+            echo "✅ Server is healthy. Deployment complete!"
+          else
+            echo "❌ Healthcheck failed! Rolling back..."
+
+            echo "🛑 Stopping broken server..."
+            pm2 stop my-api-server || true
+
+            echo "♻️ Restoring previous backup..."
+            rm -rf ~/my-node-express
+            cp -r $BACKUP_DIR/my-node-express_$TIMESTAMP ~/my-node-express
+
+            echo "🚀 Restarting server with backup..."
+            cd ~/my-node-express
+            npm install
+            pm2 start index.js --name "my-api-server"
+
+            echo "✅ Rollback successful!"
+            exit 1  # Mark GitHub Action as failed to notify you
+          fi
+
+          echo -e "\033[1;32m🏁 Finished deploy script.\033[0m"
+
 

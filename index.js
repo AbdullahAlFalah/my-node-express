@@ -260,6 +260,11 @@ app.get(`/api/films/:film_id/actors`, authenticateToken, (req, res) => {
   });
 });
 
+// Health check route
+app.get('/health', (req, res) => {
+  res.sendStatus(200); // Respond with HTTP 200 OK
+});
+
 // Start the server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
