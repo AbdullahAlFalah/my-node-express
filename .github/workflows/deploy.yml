@@ -55,7 +55,7 @@ jobs:
           pm2 reload my-api-server || pm2 start index.js --name "my-api-server"
           
           echo "🩺 Health checking server..."
-          sleep 5 # wait for server to properly start
+          sleep 7 # wait for server to properly start
           
           # My own server's healthcheck endpoint
           HEALTHCHECK_URL="http://52.59.130.11:3000/health"
