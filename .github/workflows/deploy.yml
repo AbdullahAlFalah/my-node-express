@@ -22,8 +22,16 @@ jobs:
         script: |
           set -e # ❗ Exit on error: Aborts if any command fails to prevent half-broken deployments.
           
-          echo "📦 Ensuring build tools are installed..."
-          sudo apt-get update && sudo apt-get install -y build-essential
+          echo "🔍 Detecting OS and installing build tools..."
+          if command -v apt-get &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y build-essential
+          elif command -v yum &> /dev/null; then
+            sudo yum groupinstall -y "Development Tools"
+            sudo yum install -y gcc-c++ make
+          else
+            echo "❌ Unsupported OS: cannot install build tools"
+            exit 1 # Mark GitHub Action as failed to notify you
+          fi
 
           # === 🛡️ Backup the current version ===
           BACKUP_DIR=~/my-node-express-backups
@@ -40,7 +48,7 @@ jobs:
 
           echo "📦 Installing dependencies..."
           rm -rf node_modules # ❗ Clean Windows-compatible modules
-          npm ci --production # ❗ Reinstall fresh Linux-compatible dependencies
+          npm ci --production || exit 1 # ❗ Reinstall fresh Linux-compatible dependencies
 
           # === 🔥 Run the server using pm2 ===
           echo "🔄 Reloading server with PM2..."
@@ -54,6 +62,7 @@ jobs:
 
           if curl --fail --silent $HEALTHCHECK_URL; then
             echo "✅ Server is healthy. Deployment complete!"
+            exit 0 # Mark GitHub Action as successful
           else
             echo "❌ Healthcheck failed! Rolling back..."
 
@@ -70,7 +79,7 @@ jobs:
             pm2 start index.js --name "my-api-server"
 
             echo "✅ Rollback successful!"
-            exit 1  # Mark GitHub Action as failed to notify you
+            exit 0  
           fi
 
           echo -e "\033[1;32m🏁 Finished deploy script.\033[0m"
