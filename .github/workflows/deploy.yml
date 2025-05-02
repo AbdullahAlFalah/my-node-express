@@ -65,12 +65,12 @@ jobs:
           sleep 10 # wait for server to properly start
           HEALTHCHECK_URL='http://52.59.130.11:3000/health' # My own server's healthcheck endpoint
           echo "Healthcheck URL: $HEALTHCHECK_URL"
-          Max_TRIES=10
-          TRIES=0
+          Attempts=0
+          MAX_Attempts=10
           until curl --silent --fail $HEALTHCHECK_URL; do
-            TRIES=$((TRIES+1))
-            echo "❌⏳ Healthcheck attempt $TRIES/$MAX_TRIES failed..."
-            if [ "$TRIES" -ge "$MAX_TRIES" ]; then
+            Attempts=$((Attempts+1))
+            echo "❌⏳ Healthcheck attempt $Attempts/$MAX_Attempts failed..."
+            if [ "$Attempts" -ge "$MAX_Attempts" ]; then
 
               # === 🔄 Rollback ===
               echo "❌ Healthcheck failed! Rolling back..."
