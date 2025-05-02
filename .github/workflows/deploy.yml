@@ -67,6 +67,18 @@ jobs:
           echo "Healthcheck URL: $HEALTHCHECK_URL"
           Attempts=0
           MAX_Attempts=10
+
+          # Check if this is a first-time deployment
+          LAST_BACKUP=$(ls -td $BACKUP_DIR/my-node-express_* 2>/dev/null | head -n 1)
+          if [ -z "$LAST_BACKUP" ]; then
+          echo "🆕 No previous backup detected — assuming first deployment. Skipping healthcheck."
+          echo "🚀 Starting server..."
+          pm2 start index.js --name "my-api-server"
+          echo "✅ First-time deployment complete!"
+          exit 0 # Mark GitHub Action as successful
+          fi
+
+          # Check if the server is healthy
           until curl --silent --fail $HEALTHCHECK_URL; do
             Attempts=$((Attempts+1))
             echo "❌⏳ Healthcheck attempt $Attempts/$MAX_Attempts failed..."
@@ -78,17 +90,18 @@ jobs:
               pm2 stop my-api-server || true
           
               echo "♻️ Restoring previous backup..."
-              LAST_BACKUP=$(ls -td $BACKUP_DIR/my-node-express_* | head -n 2 | tail -n 1)
-                if [ -d "$LAST_BACKUP" ]; then
-                  rm -rf ~/my-node-express
-                  cp -r $BACKUP_DIR/my-node-express_$TIMESTAMP ~/my-node-express
+              ROLLBACK_BACKUP=$(ls -td $BACKUP_DIR/my-node-express_* | grep -v "$TIMESTAMP" | head -n 1)
+              
+                if [ -d "$ROLLBACK_BACKUP" ]; then
+                  rm -rf $DEPLOY_DIR
+                  cp -r $ROLLBACK_BACKUP $DEPLOY_DIR
 
                   echo "🚀 Restarting server with backup..."
                   cd $DEPLOY_DIR
                   npm install
                   pm2 start index.js --name "my-api-server"
                   echo "✅ Rollback successful!"
-                  exit 0 # Mark GitHub Action as successful  
+                  exit 0  
                 else
                   echo "❌ No valid backup found! Manual intervention required."
                   exit 1
