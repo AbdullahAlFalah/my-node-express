@@ -22,6 +22,9 @@ jobs:
         script: |
           set -e # ❗ Exit on error: Aborts if any command fails to prevent half-broken deployments.
           
+          echo "📦 Ensuring build tools are installed..."
+          sudo apt-get update && sudo apt-get install -y build-essential
+
           # === 🛡️ Backup the current version ===
           BACKUP_DIR=~/my-node-express-backups
           TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -34,9 +37,10 @@ jobs:
           cd ~/my-node-express 
           git fetch --all
           git reset --hard origin/new-main
+
           echo "📦 Installing dependencies..."
-          rm -rf node_modules package-lock.json # ❗ Clean Windows-compatible modules
-          npm install --production # ❗ Reinstall fresh Linux-compatible dependencies
+          rm -rf node_modules # ❗ Clean Windows-compatible modules
+          npm ci --production # ❗ Reinstall fresh Linux-compatible dependencies
 
           # === 🔥 Run the server using pm2 ===
           echo "🔄 Reloading server with PM2..."
