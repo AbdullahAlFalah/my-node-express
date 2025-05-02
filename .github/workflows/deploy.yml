@@ -34,15 +34,21 @@ jobs:
           fi
 
           # === 🛡️ Backup the current version ===
+          DEPLOY_DIR=~/my-node-express
           BACKUP_DIR=~/my-node-express-backups
           TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
           mkdir -p $BACKUP_DIR
-          cp -r ~/my-node-express $BACKUP_DIR/my-node-express_$TIMESTAMP
-          echo "✅ Backup created at $BACKUP_DIR/my-node-express_$TIMESTAMP"
+
+          if [ -d "$DEPLOY_DIR" ]; then
+            echo "📦 Backing up current deployment..."
+            cp -r $DEPLOY_DIR "$BACKUP_DIR/my-node-express_$TIMESTAMP"
+          else
+            echo "⚠️ No existing deployment to back up"
+          fi
 
           # === 🚀 Pull and deply new version ===
           echo "🚀 Pulling latest code..."
-          cd ~/my-node-express 
+          cd $DEPLOY_DIR 
           git fetch --all
           git reset --hard origin/new-main
 
@@ -54,36 +60,44 @@ jobs:
           echo "🔄 Reloading server with PM2..."
           pm2 reload my-api-server || pm2 start index.js --name "my-api-server"
           
+          # === 🩺 Healthcheck ===
           echo "🩺 Health checking server..."
           sleep 10 # wait for server to properly start
-          
-          # My own server's healthcheck endpoint
-          HEALTHCHECK_URL='http://52.59.130.11:3000/health'
+          HEALTHCHECK_URL='http://52.59.130.11:3000/health' # My own server's healthcheck endpoint
           echo "Healthcheck URL: $HEALTHCHECK_URL"
-          curl -v $HEALTHCHECK_URL || echo "❌ Curl failed"
+          Max_TRIES=10
+          TRIES=0
+          until curl --silent --fail $HEALTHCHECK_URL; do
+            TRIES=$((TRIES+1))
+            echo "❌⏳ Healthcheck attempt $TRIES/$MAX_TRIES failed..."
+            if [ "$TRIES" -ge "$MAX_TRIES" ]; then
 
-          if curl --fail --silent $HEALTHCHECK_URL; then
-            echo "✅ Server is healthy. Deployment complete!"
-            exit 0 # Mark GitHub Action as successful
-          else
-            echo "❌ Healthcheck failed! Rolling back..."
+              # === 🔄 Rollback ===
+              echo "❌ Healthcheck failed! Rolling back..."
+              echo "🛑 Stopping broken server..."
+              pm2 stop my-api-server || true
+          
+              echo "♻️ Restoring previous backup..."
+              LAST_BACKUP=$(ls -td $BACKUP_DIR/my-node-express_* | head -n 2 | tail -n 1)
+                if [ -d "$LAST_BACKUP" ]; then
+                  rm -rf ~/my-node-express
+                  cp -r $BACKUP_DIR/my-node-express_$TIMESTAMP ~/my-node-express
 
-            echo "🛑 Stopping broken server..."
-            pm2 stop my-api-server || true
+                  echo "🚀 Restarting server with backup..."
+                  cd $DEPLOY_DIR
+                  npm install
+                  pm2 start index.js --name "my-api-server"
+                  echo "✅ Rollback successful!"
+                  exit 0 # Mark GitHub Action as successful  
+                else
+                  echo "❌ No valid backup found! Manual intervention required."
+                  exit 1
+                fi  
+            fi
+            sleep 2
+          done  
 
-            echo "♻️ Restoring previous backup..."
-            rm -rf ~/my-node-express
-            cp -r $BACKUP_DIR/my-node-express_$TIMESTAMP ~/my-node-express
-
-            echo "🚀 Restarting server with backup..."
-            cd ~/my-node-express
-            npm install
-            pm2 start index.js --name "my-api-server"
-
-            echo "✅ Rollback successful!"
-            exit 0  
-          fi
-
+          echo "✅ Server is healthy. Deployment complete!"
           echo -e "\033[1;32m🏁 Finished deploy script.\033[0m"
 
 
