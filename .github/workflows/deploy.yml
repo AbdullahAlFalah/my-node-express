@@ -55,10 +55,12 @@ jobs:
           pm2 reload my-api-server || pm2 start index.js --name "my-api-server"
           
           echo "🩺 Health checking server..."
-          sleep 7 # wait for server to properly start
+          sleep 15 # wait for server to properly start
           
           # My own server's healthcheck endpoint
           HEALTHCHECK_URL="http://52.59.130.11:3000/health"
+          echo "Healthcheck URL: $HEALTHCHECK_URL"
+          curl -v $HEALTHCHECK_URL || echo "❌ Curl failed"
 
           if curl --fail --silent $HEALTHCHECK_URL; then
             echo "✅ Server is healthy. Deployment complete!"

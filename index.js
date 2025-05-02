@@ -271,10 +271,14 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
+// Gracefully handle process termination
 process.on("SIGINT", () => {
-  server.close(() => {
-    console.log("Server closed");
-    process.exit(0);
-  });
+  console.log("SIGINT received: Closing server...");
+  process.exit(0); // Exit the process
+});
+
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received: Closing server...");
+  process.exit(0); // Exit the process
 });
 
