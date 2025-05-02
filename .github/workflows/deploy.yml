@@ -58,7 +58,7 @@ jobs:
           sleep 10 # wait for server to properly start
           
           # My own server's healthcheck endpoint
-          HEALTHCHECK_URL="http://52.59.130.11:3000/health"
+          HEALTHCHECK_URL="http://${{ secrets.EC2_HOST }}:3000/health"
           echo "Healthcheck URL: $HEALTHCHECK_URL"
           curl -v $HEALTHCHECK_URL || echo "❌ Curl failed"
 
