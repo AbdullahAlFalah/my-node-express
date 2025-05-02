@@ -262,11 +262,19 @@ app.get(`/api/films/:film_id/actors`, authenticateToken, (req, res) => {
 
 // Health check route
 app.get('/health', (req, res) => {
+  console.log("Health check pinged");
   res.sendStatus(200); // Respond with HTTP 200 OK
 });
 
 // Start the server
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+});
+
+process.on("SIGINT", () => {
+  server.close(() => {
+    console.log("Server closed");
+    process.exit(0);
+  });
 });
 
