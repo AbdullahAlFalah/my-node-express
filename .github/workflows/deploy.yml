@@ -108,7 +108,7 @@ jobs:
           done  
 
           # === Backup the current deployment only if healthcheck passes ===
-          echo "✅📦 Server is healthy. Creating backup of the new deployment..."
+          echo "✅📦 Server is healthy. Creating backup of the new healthy deployment..."
           cp -r $DEPLOY_DIR "$BACKUP_DIR/my-node-express_$TIMESTAMP"
 
           echo "✅ Server is healthy. Deployment complete!"
