@@ -39,14 +39,21 @@ jobs:
           TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
           mkdir -p $BACKUP_DIR
 
-          if [ -d "$DEPLOY_DIR" ]; then
-            echo "📦 Backing up current deployment..."
-            cp -r $DEPLOY_DIR "$BACKUP_DIR/my-node-express_$TIMESTAMP"
-          else
-            echo "⚠️ No existing deployment to back up"
+          # Check if the deployment directory exists and is not empty for first-time deployment
+          if [ ! -d "$DEPLOY_DIR" ] || [ -z "$(ls -A $DEPLOY_DIR)" ]; then
+            echo "🆕 No existing deployment detected or deployment directory is empty — assuming first deployment."
+            echo "🚀 Deploying for the first time..."
+            mkdir -p $DEPLOY_DIR
+            cd $DEPLOY_DIR
+            git fetch --all
+            git reset --hard origin/new-main
+            npm ci --production
+            pm2 start index.js --name "my-api-server"
+            echo "✅ First-time deployment complete!"
+            exit 0 # Mark GitHub Action as successful
           fi
 
-          # === 🚀 Pull and deply new version ===
+          # === 🚀 Pull and deploy new version ===
           echo "🚀 Pulling latest code..."
           cd $DEPLOY_DIR 
           git fetch --all
@@ -56,7 +63,7 @@ jobs:
           rm -rf node_modules # ❗ Clean Windows-compatible modules
           npm ci --production || exit 1 # ❗ Reinstall fresh Linux-compatible dependencies
 
-          # === 🔥 Run the server using pm2 ===
+          # === 🔥 Run the newer server using pm2 ===
           echo "🔄 Reloading server with PM2..."
           pm2 reload my-api-server || pm2 start index.js --name "my-api-server"
           
@@ -65,19 +72,9 @@ jobs:
           sleep 10 # wait for server to properly start
           HEALTHCHECK_URL='http://52.59.130.11:3000/health' # My own server's healthcheck endpoint
           echo "Healthcheck URL: $HEALTHCHECK_URL"
+
           Attempts=0
           MAX_Attempts=10
-
-          # Check if this is a first-time deployment
-          LAST_BACKUP=$(ls -td $BACKUP_DIR/my-node-express_* 2>/dev/null | head -n 1)
-          if [ -z "$LAST_BACKUP" ]; then
-          echo "🆕 No previous backup detected — assuming first deployment. Skipping healthcheck."
-          echo "🚀 Starting server..."
-          pm2 start index.js --name "my-api-server"
-          echo "✅ First-time deployment complete!"
-          exit 0 # Mark GitHub Action as successful
-          fi
-
           # Check if the server is healthy
           until curl --silent --fail $HEALTHCHECK_URL; do
             Attempts=$((Attempts+1))
@@ -90,25 +87,29 @@ jobs:
               pm2 stop my-api-server || true
           
               echo "♻️ Restoring previous backup..."
-              ROLLBACK_BACKUP=$(ls -td $BACKUP_DIR/my-node-express_* | grep -v "$TIMESTAMP" | head -n 1)
+              ROLLBACK_BACKUP=$(ls -td $BACKUP_DIR/my-node-express_* | head -n 1)
               
-                if [ -d "$ROLLBACK_BACKUP" ]; then
-                  rm -rf $DEPLOY_DIR
-                  cp -r $ROLLBACK_BACKUP $DEPLOY_DIR
+              if [ -d "$ROLLBACK_BACKUP" ]; then
+                rm -rf $DEPLOY_DIR
+                cp -r $ROLLBACK_BACKUP $DEPLOY_DIR
 
-                  echo "🚀 Restarting server with backup..."
-                  cd $DEPLOY_DIR
-                  npm install
-                  pm2 start index.js --name "my-api-server"
-                  echo "✅ Rollback successful!"
-                  exit 0  
-                else
-                  echo "❌ No valid backup found! Manual intervention required."
-                  exit 1
-                fi  
+                echo "🚀 Restarting server with backup..."
+                cd $DEPLOY_DIR
+                npm install
+                pm2 start index.js --name "my-api-server"
+                echo "✅ Rollback successful!"
+                exit 0  
+              else
+                echo "❌ No valid backup found! Manual intervention required."
+                exit 1
+              fi  
             fi
             sleep 2
           done  
+
+          # === Backup the current deployment only if healthcheck passes ===
+          echo "✅📦 Server is healthy. Creating backup of the new deployment..."
+          cp -r $DEPLOY_DIR "$BACKUP_DIR/my-node-express_$TIMESTAMP"
 
           echo "✅ Server is healthy. Deployment complete!"
           echo -e "\033[1;32m🏁 Finished deploy script.\033[0m"
