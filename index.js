@@ -38,16 +38,14 @@ const authenticateToken = (req, res, next) => {
 
 };
 
-let outer_mysqlclient;
 let outer_pgclient;
 
-// Connect to MySQL
+// Connect to MySQL for testing purposes
 mysqlpool.getConnection((err, mysqlclient) => {
   if (err) {
     console.error('Error connecting to MySQL: ' + err.stack);
     return;
   }
-  outer_mysqlclient = mysqlclient;
   console.log('Connected to MySQL as ID ' + mysqlclient.threadId);
 });
 
@@ -82,13 +80,22 @@ app.post(`/api/users/signup`, async (req, res) => {
   try {
     // Hash the password using bcrypt
     const hashedPassword = await bcrypt.hash(password, 10);
-    outer_mysqlclient.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword], (err, result) => {
+
+    mysqlpool.getConnection((err, connection) => {
+      if (err) {
+        console.error('Error getting MySQL connection: ' + err.stack);
+        return res.status(500).json({ ServerNote: 'Database connection error!' });
+      }
+
+    connection.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword], (err, result) => {
       if (err) {
         console.error('Error executing query: ' + err.stack);
         res.status(400).json({ServerNote: 'Error creating user'});
         return;
       }
       res.status(201).json({ServerNote: 'User created successfully'}); // 201 Created: The request has succeeded, and a new resource was created, often used for successful POST requests.
+    });
+
     });
   } catch (error) {
     console.error('Error hashing password: ' + error.message);
@@ -101,7 +108,13 @@ app.post(`/api/users/signup`, async (req, res) => {
 app.post(`/api/users/login`, (req, res) => {
   const { email, password } = req.body;
 
-  outer_mysqlclient.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
+  mysqlpool.getConnection((err, connection) => {
+    if (err) {
+      console.error('Error getting MySQL connection: ' + err.stack);
+      return res.status(500).json({ ServerNote: 'Database connection error!' });
+    }
+
+  connection.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
     if (err) {
       console.error('Error executing query: ' + err.stack);
       return res.status(500).json({ServerNote: 'Server connection error!!'});
@@ -125,13 +138,21 @@ app.post(`/api/users/login`, (req, res) => {
     res.status(200).json({ ServerNote: 'Logging-in has been successful', token, }); //200 OK: The request succeeded, and the server is returning the requested resource.
   });
 
+  });
+
 });
 
 // Protected route: Get all user info based on email route
 app.get(`/api/users/getuserinfo`, authenticateToken, (req, res) => {
   const email = req.query.email; // Access email from the query parameters
 
-  outer_mysqlclient.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
+  mysqlpool.getConnection((err, connection) => {
+    if (err) {
+      console.error('Error getting MySQL connection: ' + err.stack);
+      return res.status(500).json({ ServerNote: 'Database connection error!' });
+    }
+  
+  connection.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
     if (err) {
       console.error('Error executing query: ' + err.stack);
       res.status(400).json({ServerNote: 'Error fetching user info!'});
@@ -141,6 +162,9 @@ app.get(`/api/users/getuserinfo`, authenticateToken, (req, res) => {
       data: results,
     });  
   });
+
+  });
+
 });
 
 // Reset a user's password route based on userId
@@ -152,8 +176,14 @@ app.put(`/api/users/resetpassword/:id`, (req, res) => {
     return res.status(400).json({ ServerNote: 'Old and new passwords are required!' });
   }
 
+  mysqlpool.getConnection((err, connection) => {
+    if (err) {
+      console.error('Error getting MySQL connection: ' + err.stack);
+      return res.status(500).json({ ServerNote: 'Database connection error!' });
+    }
+
   // First, get the user's current password
-  outer_mysqlclient.query('SELECT password FROM users WHERE idUsers = ?', [userId], (err, result) => {
+  connection.query('SELECT password FROM users WHERE idUsers = ?', [userId], (err, result) => {
     if (err) {
       console.error('Error fetching old password: ' + err.stack);
       return res.status(500).json({ ServerNote: 'Server error fetching old password!' });
@@ -181,13 +211,22 @@ app.put(`/api/users/resetpassword/:id`, (req, res) => {
 
   });
 
+  });
+
 });
 
 // Update an existing user route 
 app.put(`/api/users/updateuserinfo/:id`, (req, res) => {
   const { username, email } = req.body;
   const userId = req.params.id;
-  outer_mysqlclient.query('UPDATE users SET username = ?, email = ? WHERE idUsers = ?', [username, email, userId], (err, result) => {
+
+  mysqlpool.getConnection((err, connection) => {
+    if (err) {
+      console.error('Error getting MySQL connection: ' + err.stack);
+      return res.status(500).json({ ServerNote: 'Database connection error!' });
+    }
+
+  connection.query('UPDATE users SET username = ?, email = ? WHERE idUsers = ?', [username, email, userId], (err, result) => {
     if (err) {
       console.error('Error executing query: ' + err.stack);
       res.status(400).json({ServerNote: 'Error updating user!'});
@@ -195,12 +234,22 @@ app.put(`/api/users/updateuserinfo/:id`, (req, res) => {
     }
     res.status(204).json({ServerNote: 'User updated successfully!!!'}); //204 No Content: The request was successful, but there's no content to return. Useful for actions like updates where no response body is needed.
   });
+
+  });
+
 });
 
 // Delete a user route
 app.delete(`/api/users/deleteuserinfo/:id`, (req, res) => {
   const userId = req.params.id;
-  outer_mysqlclient.query('DELETE FROM users WHERE idUsers = ?', [userId], (err, result) => {
+
+  mysqlpool.getConnection((err, connection) => {
+    if (err) {
+      console.error('Error getting MySQL connection: ' + err.stack);
+      return res.status(500).json({ ServerNote: 'Database connection error!' });
+    }
+
+  connection.query('DELETE FROM users WHERE idUsers = ?', [userId], (err, result) => {
     if (err) {
       console.error('Error executing query: ' + err.stack);
       res.status(400).json({ServerNote: 'Error deleting user!'});
@@ -208,6 +257,9 @@ app.delete(`/api/users/deleteuserinfo/:id`, (req, res) => {
     }
     res.status(204).json({ServerNote: 'User deleted successfully!!!'});
   });
+
+  });
+
 });
 
 // PostgreSQL Routes:
