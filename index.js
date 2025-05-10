@@ -38,8 +38,6 @@ const authenticateToken = (req, res, next) => {
 
 };
 
-let outer_pgclient;
-
 // Connect to MySQL for testing purposes
 mysqlpool.getConnection((err, mysqlclient) => {
   if (err) {
@@ -56,8 +54,6 @@ pgsqlpool.connect((err, pgclient) => {
     console.error('Error connecting to PostgreSQL: ' + err.stack);
     return;
   }
-
-  outer_pgclient = pgclient;
 
   // Get the process ID for the current PostgreSQL connection
   pgclient.query('SELECT pg_backend_pid()', (err, result) => {
@@ -267,18 +263,28 @@ app.delete(`/api/users/deleteuserinfo/:id`, (req, res) => {
 app.get(`/api/films/getfilmsinfo`, authenticateToken, (req, res) => {
   const query = `SELECT film_id, title, description, length, replacement_cost, rating FROM film LIMIT 10`;
 
-  outer_pgclient.query(query, (err, result) => {
+  pgsqlpool.connect((err, client, release) => {
     if (err) {
-      console.error('Error executing query: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Error fetching films!' });
+      console.error('Error getting PostgreSQL connection: ' + err.stack);
+      return res.status(500).json({ ServerNote: 'Database connection error!' });
     }
 
-    res.status(200).json({
-      ServerNote: 'Films fetched successfully!',
-      data: result.rows, // Return the rows from the query result
+    client.query(query, (err, result) => {
+      release(); // Release the connection back to the pool
+      if (err) {
+        console.error('Error executing query: ' + err.stack);
+        return res.status(500).json({ ServerNote: 'Error fetching films!' });
+      }
+
+      res.status(200).json({
+        ServerNote: 'Films fetched successfully!',
+        data: result.rows, // Return the rows from the query result
+      });
+
     });
 
   });
+
 });
 
 // Route to fetch actors related to a specific film
@@ -298,18 +304,28 @@ app.get(`/api/films/:film_id/actors`, authenticateToken, (req, res) => {
       fa.film_id = $1
   `;
 
-  outer_pgclient.query(query, [filmId], (err, result) => {
+  pgsqlpool.connect((err, client, release) => {
     if (err) {
-      console.error('Error executing query: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Error fetching actors for the film!' });
+      console.error('Error getting PostgreSQL connection: ' + err.stack);
+      return res.status(500).json({ ServerNote: 'Database connection error!' });
     }
 
-    res.status(200).json({
-      ServerNote: 'Actors fetched successfully!',
-      data: result.rows, // Return the rows from the query result
-    });
+    client.query(query, [filmId], (err, result) => {
+      release(); // Release the connection back to the pool       
+      if (err) {
+        console.error('Error executing query: ' + err.stack);
+        return res.status(500).json({ ServerNote: 'Error fetching actors for the film!' });
+      }
+
+      res.status(200).json({
+        ServerNote: 'Actors fetched successfully!',
+        data: result.rows, // Return the rows from the query result
+      });
     
+    });
+
   });
+
 });
 
 // Health check route
