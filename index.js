@@ -15,6 +15,7 @@ const authenticateToken = require('./middleware/authenticateToken');
 // Imported custom routes
 const purchaseRoutes = require('./routes/purchase');
 const addFundsRoutes = require('./routes/addFunds');
+const getWalletRoutes = require('./routes/getWallet');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -28,6 +29,7 @@ app.use(cors()); // Enable CORS for all routes
 // Custom Routes Usage
 app.use('/api', purchaseRoutes);
 app.use(addFundsRoutes);
+app.use(getWalletRoutes);
 
 // Connect to MySQL for testing purposes
 mysqlpool.getConnection((err, mysqlclient) => {
