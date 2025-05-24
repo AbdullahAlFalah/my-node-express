@@ -12,7 +12,7 @@ const authenticateToken = (req, res, next) => {
   }
 
   if (!token) {
-    return res.status(401).json({ ServerNote: 'Access denied. No token provided... Secret_Key: ', SECRET_KEY });
+    return res.status(401).json({ ServerNote: 'Access denied. No token provided!' });
   }
 
   jwt.verify(token, SECRET_KEY, (err, user) => {
