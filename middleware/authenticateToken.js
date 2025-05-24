@@ -2,17 +2,13 @@ const jwt = require('jsonwebtoken');
 const SECRET_KEY = process.env.SECRET_KEY;
 
 // Middleware to protect routes
-const authenticateToken = (req, res, err, next) => {
+const authenticateToken = (req, res, next) => {
   
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (res.status===500) {
     return res.status(500).json({ ServerNote: 'Internal server error... Auth_Header: ', authHeader });
-  }
-
-  if (err) {
-    return res.status(502).json({ ServerNote: 'Error in authentication middleware: ', err });
   }
 
   if (!token) {
