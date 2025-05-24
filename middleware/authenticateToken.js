@@ -7,10 +7,6 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (res.status===500) {
-    return res.status(500).json({ ServerNote: 'Internal server error... Auth_Header: ', authHeader });
-  }
-
   if (!token) {
     return res.status(401).json({ ServerNote: 'Access denied. No token provided!' });
   }
