@@ -5,8 +5,8 @@ const authenticateToken = require('../middleware/authenticateToken');
 
 // POST /api/purchase
 router.post('/purchase/purchaseitems', authenticateToken, async (req, res) => {
-  const userId = req.user.userId; // Adjust according to your JWT payload
-  const { items } = req.body;
+  const userId = req.user.userId; // Adjust according to the JWT payload
+  const { items, currency = 'USD' } = req.body; // allow currency override, default to USD
 
   // Calculate total cost
   const totalCost = items.reduce((sum, item) => sum + item.cost, 0);
@@ -25,27 +25,40 @@ router.post('/purchase/purchaseitems', authenticateToken, async (req, res) => {
       }
 
       // Fetch wallet balance
-      connection.query('SELECT wallet FROM users WHERE idUsers = ?', [userId], (err, results) => {
+      connection.query('SELECT balance FROM wallets WHERE userId = ?', [userId], (err, results) => {
         if (err || results.length === 0) {
           connection.rollback(() => connection.release());
           return res.status(400).json({ success: false, error: "User not found" });
         }
 
-        const wallet = results[0].wallet;
-        if (wallet < totalCost) {
+        const balance = results[0].balance;
+        const walletCurrency = results[0].currency;
+        const walletStatus = results[0].status;
+
+        if (walletStatus !== 'active') {
+          connection.rollback(() => connection.release());
+          return res.status(403).json({ success: false, error: "Wallet is not active" });
+        }
+
+        if (walletCurrency !== currency) {
+          connection.rollback(() => connection.release());
+          return res.status(400).json({ success: false, error: `Wallet currency mismatch: expected ${walletCurrency}` });
+        }
+        
+        if (balance < totalCost) {
           connection.rollback(() => connection.release());
           return res.status(400).json({ success: false, error: "Insufficient funds" });
         }
 
         // Deduct wallet
-        connection.query('UPDATE users SET wallet = wallet - ? WHERE idUsers = ?', [totalCost, userId], (err) => {
+        connection.query('UPDATE wallets SET balance = balance - ? WHERE userId = ?', [totalCost, userId], (err) => {
           if (err) {
             connection.rollback(() => connection.release());
             return res.status(500).json({ success: false, error: "Failed to deduct wallet" });
           }
 
           // Save purchase record
-          const purchaseData = { userId, items: JSON.stringify(items), totalCost };
+          const purchaseData = { userId, items: JSON.stringify(items), totalCost, currency, status: 'completed' };
           connection.query('INSERT INTO purchases SET ?', purchaseData, (err) => {
             if (err) {
               connection.rollback(() => connection.release());
@@ -58,7 +71,7 @@ router.post('/purchase/purchaseitems', authenticateToken, async (req, res) => {
                 return res.status(500).json({ success: false, error: "Commit failed" });
               }
               connection.release();
-              return res.json({ success: true, newBalance: wallet - totalCost });
+              return res.json({ success: true, newBalance: balance - totalCost });
             });
           });
         });
