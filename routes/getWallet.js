@@ -32,7 +32,7 @@ router.get('/api/wallet/getWalletinfo', authenticateToken, (req, res) => {
                     (insertErr, insertResult) => {
                         if (insertErr) {
                             console.error('❌ Failed to create wallet:', insertErr.stack);
-                            return res.status(500).json({ ServerNote: 'Failed to create wallet.' });
+                            return res.status(501).json({ ServerNote: 'Failed to create wallet.' });
                         }
 
                         // Fetch the newly created wallet to get actual timestamps
@@ -42,7 +42,7 @@ router.get('/api/wallet/getWalletinfo', authenticateToken, (req, res) => {
                             (fetchErr, fetchResults) => {
                                 if (fetchErr || fetchResults.length === 0) {
                                     console.error('❌ Wallet created but failed to fetch wallet info:', fetchErr?.stack);
-                                    return res.status(500).json({ ServerNote: 'Wallet created but failed to fetch wallet info.' });
+                                    return res.status(502).json({ ServerNote: 'Wallet created but failed to fetch wallet info.' });
                                 }
                                 return res.status(201).json({
                                     ServerNote: 'Wallet created!',
