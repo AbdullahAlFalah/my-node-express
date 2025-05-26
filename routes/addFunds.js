@@ -7,7 +7,8 @@ router.post('/api/wallet/addFunds', authenticateToken, (req, res) => {
   const userId = req.user.userId;
   const { amount, currency = 'USD' } = req.body;
 
-  if (!amount || isNaN(amount) || amount <= 0) {
+  const parsedAmount = parseFloat(amount);
+  if (!parsedAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
     return res.status(400).json({ ServerNote: 'Invalid amount!' });
   }
 
@@ -49,8 +50,9 @@ router.post('/api/wallet/addFunds', authenticateToken, (req, res) => {
             if (err) {
               console.error('Error updating wallet: ' + err.stack);
               return res.status(500).json({ ServerNote: 'Error updating wallet!' });
+            } else {
+              return res.status(200).json({ ServerNote: 'Funds added successfully!' });
             }
-            res.status(200).json({ ServerNote: 'Funds added successfully!' });
           }
         );
       });
