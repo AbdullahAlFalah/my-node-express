@@ -123,7 +123,7 @@ app.post(`/api/users/login`, (req, res) => {
     }
 
     // Generate a JWT token
-    const token = jwt.sign({ userId: user.idUsers}, SECRET_KEY, { expiresIn: '1h' }); // userId: user.idUsers, can be used if userId is not hashed
+    const token = jwt.sign({ userId: user.idUsers}, SECRET_KEY, { expiresIn: '24h' }); // userId: user.idUsers, can be used if userId is not hashed
     res.status(200).json({ ServerNote: 'Logging-in has been successful', token, }); //200 OK: The request succeeded, and the server is returning the requested resource.
   });
 
