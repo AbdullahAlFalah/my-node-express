@@ -50,7 +50,7 @@ router.post('/purchase/purchaseitems', authenticateToken, async (req, res) => {
           return res.status(402).json({ success: false, ServerNote: `Wallet currency mismatch: expected ${walletCurrency}` });
         }
         
-        return res.status(200).json({ success: true, ServerNote: `Wallet balance: ${balance}, Total cost: ${totalCost}` });
+        console.log(`DEBUG: Wallet balance: ${balance}, Total cost: ${totalCost}`);
 
         if (balance < totalCost) {
           connection.rollback(() => connection.release());
