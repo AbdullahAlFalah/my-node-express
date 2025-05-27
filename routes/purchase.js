@@ -24,8 +24,8 @@ router.post('/purchase/purchaseitems', authenticateToken, async (req, res) => {
         return res.status(501).json({ success: false, ServerNote: "Transaction error!" });
       }
 
-      // Fetch wallet balance
-      connection.query('SELECT balance FROM wallets WHERE userId = ?', [userId], (err, results) => {
+      // Fetch wallet 
+      connection.query('SELECT balance, currency, status FROM wallets WHERE userId = ?', [userId], (err, results) => {
         if (err) {
           connection.rollback(() => connection.release());
           return res.status(502).json({ success: false, ServerNote: "Fetching wallet failed!" });
