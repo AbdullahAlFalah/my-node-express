@@ -38,6 +38,7 @@ mysqlpool.getConnection((err, mysqlclient) => {
     return;
   }
   console.log('Connected to MySQL as ID ' + mysqlclient.threadId);
+  mysqlclient.release(); // ✅ Good practice, but not critical for a one-time test
 });
 
 // Connect to PostgreSQL
@@ -49,14 +50,14 @@ pgsqlpool.connect((err, pgclient) => {
   }
 
   // Get the process ID for the current PostgreSQL connection
-  pgclient.query('SELECT pg_backend_pid()', (err, result) => {
-    /* release(); // Release the client back to the pool */
+  pgclient.query('SELECT pg_backend_pid()', (err, result) => {   
     if (err) {
       console.error('Error getting current query: ' + err.stack);
       return;
     }
     const pgConnectionId = result.rows[0].pg_backend_pid;
     console.log('Connected to PostgreSQL as PID ' + pgConnectionId);
+    release(); // ✅ Always release after your test query
   });
 
 });
@@ -67,28 +68,34 @@ app.post(`/api/users/signup`, async (req, res) => {
   const { username, email, password } = req.body;
 
   try {
+
     // Hash the password using bcrypt
     const hashedPassword = await bcrypt.hash(password, 10);
 
     mysqlpool.getConnection((err, connection) => {
       if (err) {
         console.error('Error getting MySQL connection: ' + err.stack);
-        return res.status(500).json({ ServerNote: 'Database connection error!' });
+        return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
       }
 
-    connection.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword], (err, result) => {
-      if (err) {
-        console.error('Error executing query: ' + err.stack);
-        res.status(400).json({ServerNote: 'Error creating user'});
-        return;
-      }
-      res.status(201).json({ServerNote: 'User created successfully'}); // 201 Created: The request has succeeded, and a new resource was created, often used for successful POST requests.
-    });
+      connection.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword], (err, result) => {
+        if (err) {
+          console.error('Error executing query: ' + err.stack);
+          // Check for duplicate email error
+          if (err.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ServerNote: 'Email already exists!'}); // 409 Conflict: The request could not be completed due to a conflict with the current state of the resource.         
+          }
+          return res.status(500).json({ServerNote: 'Error creating user'}); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.        
+        }
+        connection.release(); // Release the connection back to the pool
+        res.status(201).json({ServerNote: 'User created successfully'}); // 201 Created: The request has succeeded, and a new resource was created, often used for successful POST requests.
+      });
 
     });
+
   } catch (error) {
     console.error('Error hashing password: ' + error.message);
-    res.status(500).json({ ServerNote: 'Internal server error!!!' });
+    res.status(500).json({ ServerNote: 'Internal server error!!!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
   }
 
 });
@@ -100,32 +107,33 @@ app.post(`/api/users/login`, (req, res) => {
   mysqlpool.getConnection((err, connection) => {
     if (err) {
       console.error('Error getting MySQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' });
+      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
     }
 
-  connection.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
-    if (err) {
-      console.error('Error executing query: ' + err.stack);
-      return res.status(500).json({ServerNote: 'Server connection error!!'});
-    }
+    connection.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
+      if (err) {
+        console.error('Error executing query: ' + err.stack);
+        return res.status(500).json({ServerNote: 'Server connection error!!'}); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+      }
 
-    if (results.length === 0) {
-      return res.status(401).json({ServerNote: 'User not found!'});
-    }
+      if (results.length === 0) {
+        return res.status(401).json({ServerNote: 'User not found!'}); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
+      }
 
-    const user = results[0];
+      const user = results[0];
 
-    // Compare the provided password with the hashed password in the database
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    
-    if (!isPasswordValid) { // user.password !== password can be used if password is not hashed
-      return res.status(401).json({ServerNote: 'Invalid password!'});
-    }
+      // Compare the provided password with the hashed password in the database
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      
+      if (!isPasswordValid) { // user.password !== password can be used if password is not hashed
+        return res.status(401).json({ServerNote: 'Invalid password!'}); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
+      }
 
-    // Generate a JWT token
-    const token = jwt.sign({ userId: user.idUsers}, SECRET_KEY, { expiresIn: '24h' }); // userId: user.idUsers, can be used if userId is not hashed
-    res.status(200).json({ ServerNote: 'Logging-in has been successful', token, }); //200 OK: The request succeeded, and the server is returning the requested resource.
-  });
+      // Generate a JWT token
+      const token = jwt.sign({ userId: user.idUsers}, SECRET_KEY, { expiresIn: '24h' }); // userId: user.idUsers, can be used if userId is not hashed
+      connection.release(); // Release the connection back to the pool
+      res.status(200).json({ ServerNote: 'Logging-in has been successful', token, }); //200 OK: The request succeeded, and the server is returning the requested resource.
+    });
 
   });
 
@@ -138,19 +146,22 @@ app.get(`/api/users/getuserinfo`, authenticateToken, (req, res) => {
   mysqlpool.getConnection((err, connection) => {
     if (err) {
       console.error('Error getting MySQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' });
+      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
     }
   
-  connection.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
-    if (err) {
-      console.error('Error executing query: ' + err.stack);
-      res.status(400).json({ServerNote: 'Error fetching user info!'});
-      return;
-    }
-    res.status(200).json({ServerNote: 'User info fetched!!!',
-      data: results,
-    });  
-  });
+    connection.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
+      if (err) {
+        console.error('Error executing query: ' + err.stack);
+        return res.status(500).json({ServerNote: 'Error fetching user info!'}); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+      }
+      if (results.length === 0) {
+        return res.status(404).json({ServerNote: 'User not found!'}); // 404 Not Found: The server can not find the requested resource.
+      }
+      connection.release(); // Release the connection back to the pool
+      res.status(200).json({ServerNote: 'User info fetched!!!',
+        data: results,
+      }); // 200 OK: The request succeeded, and the server is returning the requested resource. 
+    });
 
   });
 
@@ -162,43 +173,45 @@ app.put(`/api/users/resetpassword/:id`, (req, res) => {
   const { oldPassword, newPassword } = req.body;
 
   if (!oldPassword || !newPassword) { // Check if old and new passwords are provided
-    return res.status(400).json({ ServerNote: 'Old and new passwords are required!' });
+    return res.status(400).json({ ServerNote: 'Old and new passwords are required!' }); // 400 Bad Request: The server cannot or will not process the request due to a client error (e.g., malformed request syntax, invalid request message framing, or deceptive request routing).
   }
 
   mysqlpool.getConnection((err, connection) => {
     if (err) {
       console.error('Error getting MySQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' });
+      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
     }
 
-  // First, get the user's current password
-  connection.query('SELECT password FROM users WHERE idUsers = ?', [userId], (err, result) => {
-    if (err) {
-      console.error('Error fetching old password: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Server error fetching old password!' });
-    }
-
-    if (result.length === 0) {
-      return res.status(404).json({ ServerNote: 'User not found!' });
-    }
-
-    const storedPassword = result[0].password;
-
-    // Check if the old password matches
-    if (storedPassword !== oldPassword) {
-      return res.status(401).json({ ServerNote: 'Incorrect old password!' });
-    }
-    // If the old password matches, update to the new password
-    outer_mysqlclient.query('UPDATE users SET password = ? WHERE idUsers = ?', [newPassword, userId], (err, result) => {
+    // First, get the user's current password
+    connection.query('SELECT password FROM users WHERE idUsers = ?', [userId], (err, result) => {
       if (err) {
-        console.error('Error executing query: ' + err.stack);
-        res.status(400).json({ ServerNote: 'Error resetting password!' });
-        return;
+        console.error('Error fetching old password: ' + err.stack);
+        return res.status(500).json({ ServerNote: 'Server error fetching old password!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
       }
-      res.status(200).json({ ServerNote: 'Password reset successfully!' });
-    });
 
-  });
+      if (result.length === 0) {
+        return res.status(404).json({ ServerNote: 'User not found!' }); // 404 Not Found: The server can not find the requested resource.
+      }
+
+      const storedPassword = result[0].password;
+
+      // Check if the old password matches
+      if (storedPassword !== oldPassword) {
+        return res.status(401).json({ ServerNote: 'Incorrect old password!' }); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
+      }
+
+      // If the old password matches, update to the new password
+      connection.query('UPDATE users SET password = ? WHERE idUsers = ?', [newPassword, userId], (err, result) => {
+        if (err) {
+          console.error('Error executing query: ' + err.stack);
+          res.status(500).json({ ServerNote: 'Error resetting password!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+          return;
+        }
+        res.status(200).json({ ServerNote: 'Password reset successfully!' }); // 200 OK: The request succeeded, and the server is returning the requested resource.
+      });
+
+      connection.release(); // Release the connection back to the pool
+    });
 
   });
 
@@ -212,17 +225,18 @@ app.put(`/api/users/updateuserinfo/:id`, (req, res) => {
   mysqlpool.getConnection((err, connection) => {
     if (err) {
       console.error('Error getting MySQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' });
+      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
     }
 
-  connection.query('UPDATE users SET username = ?, email = ? WHERE idUsers = ?', [username, email, userId], (err, result) => {
-    if (err) {
-      console.error('Error executing query: ' + err.stack);
-      res.status(400).json({ServerNote: 'Error updating user!'});
-      return;
-    }
-    res.status(204).json({ServerNote: 'User updated successfully!!!'}); //204 No Content: The request was successful, but there's no content to return. Useful for actions like updates where no response body is needed.
-  });
+    connection.query('UPDATE users SET username = ?, email = ? WHERE idUsers = ?', [username, email, userId], (err, result) => {
+      if (err) {
+        console.error('Error executing query: ' + err.stack);
+        res.status(500).json({ServerNote: 'Error updating user!'}); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+        return;
+      }
+      connection.release(); // Release the connection back to the pool
+      res.status(200).json({ServerNote: 'User updated successfully!!!'}); // 200 OK: The request succeeded, and the server is returning the requested resource.
+    });
 
   });
 
@@ -235,17 +249,18 @@ app.delete(`/api/users/deleteuserinfo/:id`, (req, res) => {
   mysqlpool.getConnection((err, connection) => {
     if (err) {
       console.error('Error getting MySQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' });
+      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
     }
 
-  connection.query('DELETE FROM users WHERE idUsers = ?', [userId], (err, result) => {
-    if (err) {
-      console.error('Error executing query: ' + err.stack);
-      res.status(400).json({ServerNote: 'Error deleting user!'});
-      return;
-    }
-    res.status(204).json({ServerNote: 'User deleted successfully!!!'});
-  });
+    connection.query('DELETE FROM users WHERE idUsers = ?', [userId], (err, result) => {
+      if (err) {
+        console.error('Error executing query: ' + err.stack);
+        res.status(500).json({ServerNote: 'Error deleting user!'}); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+        return;
+      }
+      connection.release(); // Release the connection back to the pool
+      res.status(200).json({ServerNote: 'User deleted successfully!!!'}); // 200 OK: The request succeeded, and the server is returning the requested resource.
+    });
 
   });
 
@@ -259,20 +274,20 @@ app.get(`/api/films/getfilmsinfo`, authenticateToken, (req, res) => {
   pgsqlpool.connect((err, client, release) => {
     if (err) {
       console.error('Error getting PostgreSQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' });
+      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
     }
 
     client.query(query, (err, result) => {
       release(); // Release the connection back to the pool
       if (err) {
         console.error('Error executing query: ' + err.stack);
-        return res.status(500).json({ ServerNote: 'Error fetching films!' });
+        return res.status(500).json({ ServerNote: 'Error fetching films!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
       }
 
       res.status(200).json({
         ServerNote: 'Films fetched successfully!',
         data: result.rows, // Return the rows from the query result
-      });
+      }); // 200 OK: The request succeeded, and the server is returning the requested resource.
 
     });
 
@@ -300,20 +315,20 @@ app.get(`/api/films/:film_id/actors`, authenticateToken, (req, res) => {
   pgsqlpool.connect((err, client, release) => {
     if (err) {
       console.error('Error getting PostgreSQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' });
+      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
     }
 
     client.query(query, [filmId], (err, result) => {
       release(); // Release the connection back to the pool       
       if (err) {
         console.error('Error executing query: ' + err.stack);
-        return res.status(500).json({ ServerNote: 'Error fetching actors for the film!' });
+        return res.status(500).json({ ServerNote: 'Error fetching actors for the film!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
       }
 
       res.status(200).json({
         ServerNote: 'Actors fetched successfully!',
         data: result.rows, // Return the rows from the query result
-      });
+      }); // 200 OK: The request succeeded, and the server is returning the requested resource.
     
     });
 

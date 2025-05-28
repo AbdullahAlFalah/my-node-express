@@ -23,7 +23,11 @@ router.post('/api/wallet/addFunds', authenticateToken, (req, res) => {
       'SELECT status, currency FROM wallets WHERE userId = ?',
       [userId],
       (err, results) => {
-        if (err || results.length === 0) {
+        if (err) {
+          connection.release();         
+          return res.status(500).json({ ServerNote: 'Error fetching wallet!' }); // 500: Internal Server Error
+        }
+        if (results.length === 0) {
           connection.release();
           return res.status(404).json({ ServerNote: 'Wallet not found!' }); // 404: Not Found
         }
@@ -44,7 +48,7 @@ router.post('/api/wallet/addFunds', authenticateToken, (req, res) => {
         // Update wallet balance    
         connection.query(
           'UPDATE wallets SET balance = balance + ? WHERE userId = ?',
-          [amount, userId],
+          [parsedAmount, userId],
           (err, result) => {
             connection.release();
             if (err) {

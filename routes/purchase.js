@@ -74,7 +74,7 @@ router.post('/purchase/purchaseitems', authenticateToken, async (req, res) => {
 
             connection.commit((err) => {
               if (err) {
-                connection.rollback(() => connection.release());
+                connection.rollback(() => connection.release()); // Rollback transaction on commit error
                 return res.status(500).json({ success: false, ServerNote: "Commit failed" }); // 500: Internal Server Error
               }
               connection.release();
