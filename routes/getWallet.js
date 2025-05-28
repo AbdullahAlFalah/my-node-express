@@ -14,7 +14,7 @@ router.get('/api/wallet/getWalletinfo', authenticateToken, (req, res) => {
             if (err) {
                 // Log the error and send a response
                 console.error('Error executing query: ' + err.stack);
-                return res.status(500).json({ServerNote: 'Database error!'}); 
+                return res.status(500).json({ServerNote: 'Database error!'}); // 500: Internal Server Error
             }
 
             if (results.length === 0) {
@@ -32,7 +32,7 @@ router.get('/api/wallet/getWalletinfo', authenticateToken, (req, res) => {
                     (insertErr, insertResult) => {
                         if (insertErr) {
                             console.error('❌ Failed to create wallet:', insertErr.stack);
-                            return res.status(501).json({ ServerNote: 'Failed to create wallet.' });
+                            return res.status(500).json({ ServerNote: 'Failed to create wallet.' }); // 500: Internal Server Error
                         }
 
                         // Fetch the newly created wallet to get actual timestamps
@@ -42,12 +42,12 @@ router.get('/api/wallet/getWalletinfo', authenticateToken, (req, res) => {
                             (fetchErr, fetchResults) => {
                                 if (fetchErr || fetchResults.length === 0) {
                                     console.error('❌ Wallet created but failed to fetch wallet info:', fetchErr?.stack);
-                                    return res.status(502).json({ ServerNote: 'Wallet created but failed to fetch wallet info.' });
+                                    return res.status(500).json({ ServerNote: 'Wallet created but failed to fetch wallet info.' }); // 500: Internal Server Error
                                 }
                                 return res.status(201).json({
                                     ServerNote: 'Wallet created!',
                                     walletInfo: fetchResults[0]
-                                });
+                                }); // 201: Resource Created
                             }
                         );
                     }
@@ -57,7 +57,7 @@ router.get('/api/wallet/getWalletinfo', authenticateToken, (req, res) => {
                 return res.status(200).json({
                     ServerNote: 'Wallet info fetched!!!',
                     walletInfo: results[0] 
-                });
+                }); // 200: OK
             }
         }
     );

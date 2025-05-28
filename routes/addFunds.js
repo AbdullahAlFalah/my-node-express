@@ -9,13 +9,13 @@ router.post('/api/wallet/addFunds', authenticateToken, (req, res) => {
 
   const parsedAmount = parseFloat(amount);
   if (!parsedAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
-    return res.status(400).json({ ServerNote: 'Invalid amount!' });
+    return res.status(400).json({ ServerNote: 'Invalid amount!' }); // 400: Bad Request
   }
 
   mysqlpool.getConnection((err, connection) => {
     if (err) {
       console.error('Error getting MySQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' });
+      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500: Internal Server Error
     }
 
     // Check wallet status and currency before updating
@@ -25,7 +25,7 @@ router.post('/api/wallet/addFunds', authenticateToken, (req, res) => {
       (err, results) => {
         if (err || results.length === 0) {
           connection.release();
-          return res.status(404).json({ ServerNote: 'Wallet not found!' });
+          return res.status(404).json({ ServerNote: 'Wallet not found!' }); // 404: Not Found
         }
 
         const walletStatus = results[0].status;
@@ -33,12 +33,12 @@ router.post('/api/wallet/addFunds', authenticateToken, (req, res) => {
 
         if (walletStatus !== 'active') {
           connection.release();
-          return res.status(403).json({ ServerNote: 'Wallet is not active!' });
+          return res.status(403).json({ ServerNote: 'Wallet is not active!' }); // 403: Forbidden (valid token, but not allowed)
         }
 
         if (walletCurrency !== currency) {
           connection.release();
-          return res.status(400).json({ ServerNote: `Wallet currency mismatch: expected ${walletCurrency}` });
+          return res.status(400).json({ ServerNote: `Wallet currency mismatch: expected ${walletCurrency}` }); // 400: Bad Request
         }
 
         // Update wallet balance    
@@ -49,9 +49,9 @@ router.post('/api/wallet/addFunds', authenticateToken, (req, res) => {
             connection.release();
             if (err) {
               console.error('Error updating wallet: ' + err.stack);
-              return res.status(500).json({ ServerNote: 'Error updating wallet!' });
+              return res.status(500).json({ ServerNote: 'Error updating wallet!' }); // 500: Internal Server Error
             } else {
-              return res.status(200).json({ ServerNote: 'Funds added successfully!' });
+              return res.status(200).json({ ServerNote: 'Funds added successfully!' }); // 200: OK
             }
           }
         );
