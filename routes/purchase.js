@@ -6,7 +6,7 @@ const authenticateToken = require('../middleware/authenticateToken');
 // POST /api/purchase
 router.post('/purchase/purchaseitems', authenticateToken, async (req, res) => {
   const userId = req.user.userId; // Adjust according to the JWT payload
-  const { items, currency = 'USD' } = req.body; // allow currency override, default to USD
+  const { items, currency = 'USD' } = req.body; // allow currency override, default to USD for testing
 
   // Calculate total cost
   const totalCost = items.reduce((sum, item) => sum + item.cost, 0);

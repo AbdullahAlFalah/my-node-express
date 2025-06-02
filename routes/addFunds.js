@@ -3,9 +3,11 @@ const router = express.Router();
 const mysqlpool = require('../DifferentDatabases/MySQL');
 const authenticateToken = require('../middleware/authenticateToken');
 
+const convert = require('../utils/currencyConversion');
+
 router.post('/api/wallet/addFunds', authenticateToken, (req, res) => {
   const userId = req.user.userId;
-  const { amount, currency = 'USD' } = req.body;
+  const { amount, currency } = req.body;
 
   const parsedAmount = parseFloat(amount);
   if (!parsedAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
@@ -41,8 +43,32 @@ router.post('/api/wallet/addFunds', authenticateToken, (req, res) => {
         }
 
         if (walletCurrency !== currency) {
-          connection.release();
-          return res.status(400).json({ ServerNote: `Wallet currency mismatch: expected ${walletCurrency}` }); // 400: Bad Request
+          // Convert the amount to the wallet's currency
+          convert(parsedAmount, currency, walletCurrency)
+          .then(convertedAmount => {
+            connection.query(
+              'UPDATE wallets SET balance = balance + ? WHERE userId = ?',
+              [convertedAmount, userId],
+              (err, result) => {
+                connection.release();
+                if (err) {                  
+                  return res.status(500).json({ ServerNote: 'Error updating wallet after conversion:' + err.stack }); // 500: Internal Server Error
+                } else {
+                  return res.status(200).json({ 
+                    ServerNote: `Funds added successfully! Converted ${parsedAmount} ${currency} to ${convertedAmount.toFixed(2)} ${walletCurrency}` 
+                  }); // 200: OK
+                }
+              }
+            );
+          })
+          .catch(err => {
+            connection.release();
+            // Conversion failed, now send 400 or 422
+            return res.status(400).json({ 
+              ServerNote: `Currency conversion failed or unsupported currency: Wallet currency mismatch: expected ${walletCurrency}` 
+            }); // 400: Bad Request
+          });  
+          return;  
         }
 
         // Update wallet balance    
