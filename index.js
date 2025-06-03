@@ -42,7 +42,7 @@ mysqlpool.getConnection((err, mysqlclient) => {
 });
 
 // Connect to PostgreSQL
-pgsqlpool.connect((err, pgclient) => {
+pgsqlpool.connect((err, pgclient, release) => {
 
   if (err) {
     console.error('Error connecting to PostgreSQL: ' + err.stack);
