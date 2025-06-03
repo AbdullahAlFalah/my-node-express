@@ -65,7 +65,7 @@ router.post('/api/wallet/addFunds', authenticateToken, (req, res) => {
             connection.release();
             // Conversion failed, now send 400 response
             return res.status(400).json({ 
-              ServerNote: `Currency conversion failed or unsupported currency: Wallet currency mismatch: expected ${walletCurrency}` 
+              ServerNote: `Currency conversion failed or unsupported currency:\n${err.stack||err.message||err}\nWallet currency mismatch: expected ${walletCurrency}` 
             }); // 400: Bad Request
           });  
           return;  
