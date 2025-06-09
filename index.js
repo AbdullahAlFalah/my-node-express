@@ -88,6 +88,10 @@ app.post(`/api/users/signup`, async (req, res) => {
           return res.status(500).json({ServerNote: 'Error creating user'}); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.        
         }
         connection.release(); // Release the connection back to the pool
+        // Send greeting email (don't block response on error)
+        sendGreetingEmail(email, username)
+          .then(() => console.log(`Greeting email sent to ${email}`))
+          .catch(e => console.error('Failed to send greeting email:', e.message));
         res.status(201).json({ServerNote: 'User created successfully'}); // 201 Created: The request has succeeded, and a new resource was created, often used for successful POST requests.
       });
 
