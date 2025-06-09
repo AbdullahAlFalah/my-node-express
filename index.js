@@ -17,6 +17,9 @@ const purchaseRoutes = require('./routes/purchase');
 const addFundsRoutes = require('./routes/addFunds');
 const getWalletRoutes = require('./routes/getWallet');
 
+// Imported custom utility functions
+const sendGreetingEmail = require('./utils/sendEmail');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SECRET_KEY = process.env.SECRET_KEY;
