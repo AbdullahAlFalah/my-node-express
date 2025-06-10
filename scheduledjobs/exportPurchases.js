@@ -11,7 +11,7 @@ const KEYFILEPATH = path.join(__dirname, '../Keys/service-account.json');
 const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
 // Configuration constants
-const CRON_SCHEDULE = '0 * * * *'; // Runs every hour for testing only (cron format: minute hour dayOfMonth month dayOfWeek)
+const CRON_SCHEDULE = '0 0 1 * *'; // Runs once per month on the 1st at midnight (cron format: minute hour dayOfMonth month dayOfWeek)
 const MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const WORKSHEET_NAME = 'Purchases';
 
