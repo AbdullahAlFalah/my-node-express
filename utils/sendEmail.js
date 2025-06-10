@@ -3,15 +3,15 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER, // your Gmail address
-    pass: process.env.EMAIL_PASSWORD  // your Gmail app password
+    user: process.env.EMAIL_ADMIN, // Admin Gmail address
+    pass: process.env.EMAIL_PASSWORD  // Admin Gmail app password
   }
 });
 
 // Greeting email for new users
 async function sendGreetingEmail(to, username) {
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: process.env.EMAIL_ADMIN,
     to,
     subject: 'Welcome to Our App!',
     text: `Hello ${username},\n\nThank you for signing up! We're glad to have you on board.\n\nBest regards,\nAbdullah Al-Falah`
@@ -21,10 +21,10 @@ async function sendGreetingEmail(to, username) {
 }
 
 // Notification email for monthly export
-async function sendExportNotifyEmail(to, fileName, fileId) {
+async function sendExportNotifyEmail(fileName, fileId) {
   const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to,
+    from: process.env.EMAIL_ADMIN,
+    to: process.env.EMAIL_ADMIN, 
     subject: 'Monthly Purchases Exported',
     text: `Hello,\n\nYour monthly purchases have been exported and uploaded to Google Drive.\n\nFile Name: ${fileName}\nGoogle Drive File ID: ${fileId}\n\nBest regards,\nYour Backend System`
   };

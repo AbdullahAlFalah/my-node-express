@@ -1,5 +1,4 @@
 const { google } = require('googleapis');
-const fs = require('fs');
 const path = require('path');
 const cron = require('node-cron');
 const ExcelJS = require('exceljs');
@@ -10,6 +9,8 @@ const { sendExportNotifyEmail } = require('../utils/sendEmail');
 const KEYFILEPATH = path.join(__dirname, '../Keys/service-account.json');
 const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
+const CRON_SCHEDULE = '0 * * * *'; // Runs every hour for testing only (cron format: minute hour dayOfMonth month dayOfWeek)
+
 const auth = new google.auth.GoogleAuth({
   keyFile: KEYFILEPATH,
   scopes: SCOPES,
@@ -17,58 +18,85 @@ const auth = new google.auth.GoogleAuth({
 
 const drive = google.drive({ version: 'v3', auth });
 
-async function uploadToDrive(filePath, fileName, folderId) {
-  const fileMetadata = {
-    name: fileName,
-    parents: [folderId], // Google Drive folder ID
-  };
-  const media = {
-    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    body: fs.createReadStream(filePath),
-  };
-  const res = await drive.files.create({
-    resource: fileMetadata,
-    media: media,
-    fields: 'id',
-  });
-  return res.data.id;
-}
+/**
+ * Create Excel workbook in memory and upload directly to Drive
+ * @fileoverview Scheduled job to export purchases to Excel and upload to Google Drive
+ * @version 1.0.0
+ * @param {Array<{purchaseId: number, userId: number, items: string, totalCost: number, currency: string, status: string, createdAt: Date, updatedAt: Date}>} purchases
+ * @returns {Promise<string>} Google Drive file ID of the uploaded Excel file
+ * @throws {Error} If purchases array is empty or upload fails
+ */
 
-async function ExportPurchases(results) {
+async function exportPurchasesToDrive(purchases) {
+
+    if (!Array.isArray(purchases) || !purchases.length) {
+        throw new Error('No purchases to export');
+    }
     
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Purchases');
-    worksheet.columns = Object.keys(results[0] || {}).map(key => ({
-      header: key,
-      key: key,
-      width: 20
-    }));
-    results.forEach(row => worksheet.addRow(row));
 
+    // Define columns with proper formatting
+    worksheet.columns = [
+        { header: 'Purchase ID', key: 'purchaseId', width: 15 },
+        { header: 'User ID', key: 'userId', width: 15 },
+        { header: 'Items', key: 'items', width: 40 },
+        { header: 'Total Cost', key: 'totalCost', width: 15 },
+        { header: 'Currency', key: 'currency', width: 10 },
+        { header: 'Status', key: 'status', width: 15 },
+        { header: 'Created At', key: 'createdAt', width: 20 },
+        { header: 'Updated At', key: 'updatedAt', width: 20 }
+    ];
+
+    // Add data and format dates
+    purchases.forEach(purchase => {
+        worksheet.addRow({
+            ...purchase,
+            items: JSON.stringify(purchase.items), // Format JSON items as string
+            createdAt: new Date(purchase.createdAt).toLocaleString(),
+            updatedAt: new Date(purchase.updatedAt).toLocaleString()
+        });
+    });
+
+    // Generate Excel buffer
+    const buffer = await workbook.xlsx.writeBuffer();
     const fileName = `purchases_${Date.now()}.xlsx`;
-    const filePath = path.join(__dirname, `../exports/${fileName}`);
-    await workbook.xlsx.writeFile(filePath);
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
 
-    // Upload to Google Drive
-    const folderId = '1NdfeATq6AQOSQ3kOr4cxOuQOPTfYgIG9'; // Folder ID in Google Drive
     try {
-      const fileId = await uploadToDrive(filePath, fileName, folderId);
-      console.log(`✅ Purchases exported and uploaded to Google Drive (file ID: ${fileId})`);
 
-      // Send notification email after successful upload
-      await sendExportNotifyEmail(
-        process.env.EMAIL_USER, // send to myself
-        fileName,
-        fileId
-      );
-      console.log('✅ Export notification email sent.');
-    } catch (e) {
-      console.error('❌ Failed to upload to Google Drive:', e.message);
+        // Upload buffer directly to Drive
+        const fileMetadata = {
+            name: fileName,
+            parents: [folderId]
+        };
+
+        const media = {
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            body: Buffer.from(buffer)
+        };
+
+        const response = await drive.files.create({
+            resource: fileMetadata,
+            media: media,
+            fields: 'id'
+        });
+
+        // Send notification email
+        await sendExportNotifyEmail(
+            fileName,
+            response.data.id
+        );
+        
+        return response.data.id;
+    } catch (error) {
+        console.error('❌ Failed to upload to Drive:', error.message);
+        throw error;
     }
 
 }
 
-cron.schedule('0 0 * * 2', async () => { // Runs every Tuesday at midnight (cron format: minute hour dayOfMonth month dayOfWeek)
+cron.schedule(CRON_SCHEDULE, async () => {
   console.log('⏰ Running scheduled purchase export job...');
 
   mysqlpool.query('SELECT * FROM purchases', async (err, results) => {
@@ -83,9 +111,20 @@ cron.schedule('0 0 * * 2', async () => { // Runs every Tuesday at midnight (cron
     }
 
     // Call the async function to handle the rest
-    ExportPurchases(results).catch(e => {
-      console.error('❌ Export/upload failed:', e.message);
-    });
+    try {
+        const fileId = await exportPurchasesToDrive(results);
+        console.log(`✅ Purchases exported to Google Drive (file ID: ${fileId})`);
+        console.log(`📊 Total records: ${results.length}`);
+        console.log(`📅 Export time: ${new Date().toLocaleString()}`);
+    } catch (error) {
+        console.error('❌ Export/upload failed:', {
+          message: error.message,
+          stack: error.stack,
+          time: new Date().toLocaleString(),
+          totalPurchases: results.length
+        });
+    }
+
   });
 
 });
