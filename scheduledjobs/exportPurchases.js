@@ -1,4 +1,5 @@
 const { google } = require('googleapis');
+const { Readable } = require('stream');
 const path = require('path');
 const cron = require('node-cron');
 const ExcelJS = require('exceljs');
@@ -9,7 +10,10 @@ const { sendExportNotifyEmail } = require('../utils/sendEmail');
 const KEYFILEPATH = path.join(__dirname, '../Keys/service-account.json');
 const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
+// Configuration constants
 const CRON_SCHEDULE = '0 * * * *'; // Runs every hour for testing only (cron format: minute hour dayOfMonth month dayOfWeek)
+const MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const WORKSHEET_NAME = 'Purchases';
 
 const auth = new google.auth.GoogleAuth({
   keyFile: KEYFILEPATH,
@@ -34,7 +38,7 @@ async function exportPurchasesToDrive(purchases) {
     }
     
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Purchases');
+    const worksheet = workbook.addWorksheet(WORKSHEET_NAME);
 
     // Define columns with proper formatting
     worksheet.columns = [
@@ -63,41 +67,47 @@ async function exportPurchasesToDrive(purchases) {
     const fileName = `purchases_${Date.now()}.xlsx`;
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
 
-    try {
-
-        // Upload buffer directly to Drive
-        const fileMetadata = {
-            name: fileName,
-            parents: [folderId]
-        };
-
-        const media = {
-            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            body: Buffer.from(buffer)
-        };
-
-        const response = await drive.files.create({
-            resource: fileMetadata,
-            media: media,
-            fields: 'id'
-        });
-
-        // Send notification email
-        await sendExportNotifyEmail(
-            fileName,
-            response.data.id
-        );
-        
-        return response.data.id;
-    } catch (error) {
-        console.error('❌ Failed to upload to Drive:', error.message);
-        throw error;
+    if (!folderId) {
+        throw new Error('Google Drive folder ID not configured');
     }
+
+    // Create a readable stream from buffer
+    const stream = new Readable();
+    stream.push(buffer);
+    stream.push(null);
+
+    // Upload buffer directly to Drive
+    const fileMetadata = {
+        name: fileName,
+        parents: [folderId]
+    };
+
+    const media = {
+        mimeType: MIME_TYPE,
+        body: stream
+    };
+
+               
+    const response = await drive.files.create({
+        resource: fileMetadata,
+        media: media,
+        fields: 'id'
+    });
+
+    // Send notification email
+    await sendExportNotifyEmail(
+        fileName,
+        response.data.id
+    );
+        
+    return response.data.id;
 
 }
 
+// Main schedule handler with single try-catch
 cron.schedule(CRON_SCHEDULE, async () => {
-  console.log('⏰ Running scheduled purchase export job...');
+  const startTime = new Date();
+  console.log(`⏰ Starting purchase export job at ${startTime.toLocaleString()}`);
 
   mysqlpool.query('SELECT * FROM purchases', async (err, results) => {
     if (err) {
