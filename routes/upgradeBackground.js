@@ -61,7 +61,7 @@ router.post('/api/background/upgrade', authenticateToken, (req, res) => {
 
               // 3. Get asset for next level
               connection.query(
-                'SELECT assetName, driveFileId FROM background_upgrades_assets WHERE level = ?',
+                'SELECT assetName, CDN_URL FROM background_upgrades_assets WHERE level = ?',
                 [nextLevel],
                 (err, assetResults) => {
                   if (err || assetResults.length === 0) {
@@ -71,8 +71,8 @@ router.post('/api/background/upgrade', authenticateToken, (req, res) => {
                     });
                   }
 
-                  const { assetName, driveFileId } = assetResults[0];
-                  const assetUrl = `https://drive.google.com/uc?export=view&id=${driveFileId}`;
+                  const { assetName, CDN_URL } = assetResults[0];
+                  const assetUrl = `${CDN_URL}`;
 
                   // 4. Deduct coins: insert new reward record with updated total
                   const newTotalCoins = totalCoins - upgradeCost;
