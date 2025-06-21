@@ -18,6 +18,7 @@ const purchaseRoutes = require('./routes/purchase');
 const addFundsRoutes = require('./routes/addFunds');
 const getWalletRoutes = require('./routes/getWallet');
 const sendReward = require('./routes/sendReward');
+const upgradeBackground = require('./routes/upgradeBackground');
 
 // Imported custom utility functions
 const { sendGreetingEmail } = require('./utils/sendEmail');
@@ -36,6 +37,7 @@ app.use('/api', purchaseRoutes);
 app.use(addFundsRoutes);
 app.use(getWalletRoutes);
 app.use(sendReward);
+app.use(upgradeBackground);
 
 // Connect to MySQL for testing purposes
 mysqlpool.getConnection((err, mysqlclient) => {
