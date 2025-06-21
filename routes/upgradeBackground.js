@@ -72,7 +72,7 @@ router.post('/api/background/upgrade', authenticateToken, (req, res) => {
                   }
 
                   const { assetName, driveFileId } = assetResults[0];
-                  const assetUrl = `https://drive.google.com/uc?id=${driveFileId}`;
+                  const assetUrl = `https://drive.google.com/uc?export=view&id=${driveFileId}`;
 
                   // 4. Deduct coins: insert new reward record with updated total
                   const newTotalCoins = totalCoins - upgradeCost;
