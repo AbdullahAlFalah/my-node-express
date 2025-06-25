@@ -2,80 +2,73 @@ const express = require('express');
 const router = express.Router();
 const mysqlpool = require('../DifferentDatabases/MySQL');
 const authenticateToken = require('../middleware/authenticateToken');
-const getUpgradeCost = require('../utils/backgroundScalingCost'); 
+const { getUpgradeCost, getNextLevel, isLevelOwned } = require('../utils/backgroundUpgradeUtils'); 
 
-router.post('/api/background/upgrade', authenticateToken, (req, res) => {
+router.post('/api/background/upgrade', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
 
-  mysqlpool.getConnection((err, connection) => {
-    if (err) {
-      return res.status(500).json({ success: false, message: 'Database connection error' });
-    }
+  try {
 
-    connection.beginTransaction(err => {
+    const { nextLevel } = await getNextLevel(userId); // Get next level in the rotation
+    const owned = await isLevelOwned(userId, nextLevel); // Check if owned
+
+    mysqlpool.getConnection((err, connection) => {
       if (err) {
-        connection.release();
-        return res.status(500).json({ success: false, message: 'Transaction error' });
+        return res.status(500).json({ success: false, message: 'Database connection error' });
       }
 
-      // 1. Get user's current background level
+      // 1. Fetch asset info for next level
       connection.query(
-        'SELECT currentLevel FROM user_background_upgrades WHERE userId = ?',
-        [userId],
-        (err, results) => {
-          if (err) {
-            return connection.rollback(() => {
+        'SELECT assetName, CDN_URL FROM background_upgrades_assets WHERE level = ?',
+        [nextLevel],
+        async (err, assetResults) => {
+          if (err || assetResults.length === 0) {
               connection.release();
-              res.status(500).json({ success: false, message: 'Error fetching upgrade level' });
-            });
+              return res.status(500).json({ success: false, message: 'Asset not found for this level.' });
           }
+          const { assetName, CDN_URL } = assetResults[0];
+          const assetUrl = CDN_URL;
 
-          const currentLevel = results.length > 0 ? results[0].currentLevel : 0;
-          const nextLevel = currentLevel + 1;
-
-          if (nextLevel > 3) {
+          if (owned) {
+            // Already owned: just rotate
             connection.release();
-            return res.status(400).json({ success: false, message: 'Maximum background level reached; Congrats!!!' });
-          }
-
-          const upgradeCost = getUpgradeCost(nextLevel);
-
-          // 2. Get user's latest coin balance
-          connection.query(
-            'SELECT totalCoins FROM rewards WHERE userId = ? ORDER BY createdAt DESC LIMIT 1',
-            [userId],
-            (err, coinResults) => {
-              if (err) {
-                return connection.rollback(() => {
+            return res.json({
+              success: true,
+              message: `Background rotated to level ${nextLevel}`,
+              newLevel: nextLevel,
+              assetName,
+              assetUrl,
+              owned: true
+            });
+          } else {
+            // 2. Not owned: try to buy
+            const upgradeCost = getUpgradeCost(nextLevel);
+            connection.query(
+              'SELECT totalCoins FROM rewards WHERE userId = ? ORDER BY createdAt DESC LIMIT 1',
+              [userId],
+              (err, coinResults) => {
+                if (err) {
                   connection.release();
-                  res.status(500).json({ success: false, message: 'Error fetching coin balance' });
-                });
-              }
-
-              const totalCoins = coinResults.length > 0 ? coinResults[0].totalCoins : 0;
-
-              if (totalCoins < upgradeCost) {
-                connection.release();
-                return res.status(400).json({ success: false, message: 'Not enough coins for upgrade.' });
-              }
-
-              // 3. Get asset for next level
-              connection.query(
-                'SELECT assetName, CDN_URL FROM background_upgrades_assets WHERE level = ?',
-                [nextLevel],
-                (err, assetResults) => {
-                  if (err || assetResults.length === 0) {
-                    return connection.rollback(() => {
-                      connection.release();
-                      res.status(500).json({ success: false, message: 'Asset not found for this level.' });
-                    });
+                  return res.status(500).json({ success: false, message: 'Error fetching coin balance' });
+                }
+                const totalCoins = coinResults.length > 0 ? coinResults[0].totalCoins : 0;
+                if (totalCoins < upgradeCost) {
+                  connection.release();
+                  return res.status(400).json({
+                    success: false,
+                    message: 'Not enough coins to unlock this background.',
+                    required: upgradeCost,
+                    current: totalCoins
+                  });
+                }
+                // Transaction to ensure atomicity:                                                                         
+                connection.beginTransaction(err => {
+                  if (err) {
+                    connection.release();
+                    return res.status(500).json({ success: false, message: 'Transaction error' });
                   }
-
-                  const { assetName, CDN_URL } = assetResults[0];
-                  const assetUrl = `${CDN_URL}`;
-
-                  // 4. Deduct coins: insert new reward record with updated total
                   const newTotalCoins = totalCoins - upgradeCost;
+                  // 3. Deduct coins: insert new reward record with updated total
                   connection.query(
                     'INSERT INTO rewards (userId, rewardCoins, totalCoins) VALUES (?, ?, ?)',
                     [userId, -upgradeCost, newTotalCoins],
@@ -86,8 +79,7 @@ router.post('/api/background/upgrade', authenticateToken, (req, res) => {
                           res.status(500).json({ success: false, message: 'Error deducting coins.' });
                         });
                       }
-
-                      // 5. Update or insert user's background level
+                      // 4. Insert or update user's background level 
                       connection.query(
                         'INSERT INTO user_background_upgrades (userId, currentLevel, upgradedAt) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE currentLevel = VALUES(currentLevel), upgradedAt = NOW()',
                         [userId, nextLevel],
@@ -98,7 +90,6 @@ router.post('/api/background/upgrade', authenticateToken, (req, res) => {
                               res.status(500).json({ success: false, message: 'Error updating background level.' });
                             });
                           }
-
                           connection.commit(err => {
                             connection.release();
                             if (err) {
@@ -106,10 +97,11 @@ router.post('/api/background/upgrade', authenticateToken, (req, res) => {
                             }
                             res.json({
                               success: true,
-                              message: `Background upgraded to level ${nextLevel}!`,
+                              message: `Background unlocked and rotated to level ${nextLevel}!`,
                               newLevel: nextLevel,
                               assetName,
                               assetUrl,
+                              owned: true,
                               remainingCoins: newTotalCoins
                             });
                           });
@@ -117,14 +109,16 @@ router.post('/api/background/upgrade', authenticateToken, (req, res) => {
                       );
                     }
                   );
-                }
-              );
-            }
-          );
+                });                 
+              }
+            );
+          }
         }
       );
     });
-  });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Unexpected error', error: error.message });
+  }
 });
 
 module.exports = router;
