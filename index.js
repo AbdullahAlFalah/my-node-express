@@ -1,5 +1,8 @@
 require('dotenv').config();
+
+// Imported scheduled jobs
 require('./scheduledjobs/exportPurchases');
+require('./scheduledjobs/sendScheduledNotifications');
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -19,6 +22,7 @@ const addFundsRoutes = require('./routes/addFunds');
 const getWalletRoutes = require('./routes/getWallet');
 const sendReward = require('./routes/sendReward');
 const upgradeBackground = require('./routes/upgradeBackground');
+const sendRemoteNotifications = require('./routes/sendRemoteNotifications');
 
 // Imported custom utility functions
 const { sendGreetingEmail } = require('./utils/sendEmail');
@@ -38,6 +42,7 @@ app.use(addFundsRoutes);
 app.use(getWalletRoutes);
 app.use(sendReward);
 app.use(upgradeBackground);
+app.use(sendRemoteNotifications);
 
 // Connect to MySQL for testing purposes
 mysqlpool.getConnection((err, mysqlclient) => {

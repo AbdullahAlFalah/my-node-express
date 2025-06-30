@@ -39,8 +39,22 @@ async function sendExportNotifyEmail(fileName, fileId, folderId = process.env.GO
   return transporter.sendMail(mailOptions);
 }
 
+// Notification email for push notifications scheduled job
+async function sendNotificationResultToAdmin(summary) {
+  const mailOptions = {
+    from: process.env.EMAIL_ADMIN,
+    to: process.env.EMAIL_ADMIN,
+    subject: `Push Notification Results for Summary`,
+    text: summary.map(item =>
+      `Email: ${item.email}\nSuccess: ${item.success}\nMessage: ${item.message}\n`
+    ).join('\n------------------------\n')
+  };
+  return transporter.sendMail(mailOptions);
+}
+
 module.exports = {
   sendGreetingEmail,
   sendExportNotifyEmail,
+  sendNotificationResultToAdmin,
 };
 
