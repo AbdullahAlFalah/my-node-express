@@ -4,7 +4,7 @@ const { sendNotificationResultToAdmin } = require('../utils/sendEmail');
 const mysqlpool = require('../DifferentDatabases/MySQL');
 
 // Configuration constants
-const CRON_SCHEDULE = '0 0 1 * *'; // Runs once per month on the 1st at midnight (cron format: minute hour dayOfMonth month dayOfWeek)
+const CRON_SCHEDULE = '0 * * * *'; // Runs once every hour (cron format: minute hour dayOfMonth month dayOfWeek)
 
 // Send notification to all users by token
 async function sendToAllTokens(title, body) {
