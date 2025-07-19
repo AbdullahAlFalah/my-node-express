@@ -48,12 +48,14 @@ async function getNextLevel(userId) {
 function isLevelOwned(userId, level) {
     return new Promise((resolve, reject) => {
         mysqlpool.query(
-            'SELECT currentLevel FROM user_background_upgrades WHERE userId = ?',
+            'SELECT ownedLevels FROM user_background_upgrades WHERE userId = ?',
             [userId],
             (err, results) => {
                 if (err) return reject(err);
-                const ownedLevel = results.length > 0 ? results[0].currentLevel : 0;
-                resolve(level <= ownedLevel);
+                const ownedMask = results.length > 0 ? results[0].ownedLevels : 0;
+                const levelBit = 1 << level; // Create a bitmask for the level
+                const isOwned = (ownedMask & levelBit) !== 0; // Check if the level bit is set
+                resolve(isOwned);
             }
         );
     });

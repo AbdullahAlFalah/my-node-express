@@ -81,8 +81,14 @@ router.post('/api/background/upgrade', authenticateToken, async (req, res) => {
                       }
                       // 4. Insert or update user's background level 
                       connection.query(
-                        'INSERT INTO user_background_upgrades (userId, currentLevel, upgradedAt) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE currentLevel = VALUES(currentLevel), upgradedAt = NOW()',
-                        [userId, nextLevel],
+                        `INSERT INTO user_background_upgrades 
+                          (userId, currentLevel, ownedLevels, upgradedAt) 
+                        VALUES (?, ?, ?, NOW()) 
+                        ON DUPLICATE KEY UPDATE 
+                          currentLevel = VALUES(currentLevel), 
+                          ownedLevels = ownedLevels | VALUES(ownedLevels),
+                          upgradedAt = NOW()`,
+                        [userId, nextLevel, 1 << nextLevel], // Last entry sets the bit for the new level
                         (err) => {
                           if (err) {
                             return connection.rollback(() => {
