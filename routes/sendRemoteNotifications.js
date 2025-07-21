@@ -9,8 +9,8 @@ router.post('/api/notification/registerPushToken', authenticateToken, (req, res)
     const { expoPushToken } = req.body;
     const userId = req.user.userId;
 
-    if (!expoPushToken || !email) {
-        return res.status(400).json({ message: "expoPushToken and email are required." });
+    if (!expoPushToken || !userId) {
+        return res.status(400).json({ message: "expoPushToken and userId are required." });
     }
 
     // Step 1: Get the user's email from the database
