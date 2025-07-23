@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mysqlpool = require('../DifferentDatabases/MySQL');
 const authenticateToken = require('../middleware/authenticateToken');
-const sendExpoNotification = require('../utils/sendNotificationUtil');
+const { sendExpoNotification } = require('../utils/sendNotificationUtil');
 
 // Register push token (with DB)
 router.post('/api/notification/registerPushToken', authenticateToken, (req, res) => {
