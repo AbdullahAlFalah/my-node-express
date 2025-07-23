@@ -46,7 +46,7 @@ router.post('/api/notification/registerPushToken', authenticateToken, (req, res)
                         "Welcome!",
                         "You will now receive push notifications."
                     );
-                    res.json({ message: "Push token registered successfully and a notification is send." });
+                    res.status(200).json({ message: "Push token registered successfully and a notification is send." });
                 }
             );
 
