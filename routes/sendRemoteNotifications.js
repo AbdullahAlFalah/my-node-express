@@ -15,7 +15,7 @@ router.post('/api/notification/registerPushToken', authenticateToken, (req, res)
 
     // Step 1: Get the user's email from the database
     mysqlpool.query(
-        'SELECT email FROM users WHERE id = ?',
+        'SELECT email FROM users WHERE idUsers = ?',
         [userId],
         (err, results) => {
             if (err) {
