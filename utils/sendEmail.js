@@ -39,7 +39,18 @@ async function sendExportNotifyEmail(fileName, fileId, folderId = process.env.GO
   return transporter.sendMail(mailOptions);
 }
 
-// Notification email for push notifications scheduled job
+// Notification email for user about push notifications registration
+async function sendPushNotificationRegistrationEmail(email) {
+  const mailOptions = {
+    from: process.env.EMAIL_ADMIN,
+    to: email,
+    subject: 'Push Notification Registration Successful',
+    text: `Hello,\n\nYou have successfully registered for push notifications by logging in.\n\nYou will now receive push notifications."\n\nBest regards,\nYour Backend System`
+  };
+  return transporter.sendMail(mailOptions);
+}
+
+// Notification email for admin about push notifications scheduled job
 async function sendNotificationResultToAdmin(summary) {
   const mailOptions = {
     from: process.env.EMAIL_ADMIN,
@@ -55,6 +66,7 @@ async function sendNotificationResultToAdmin(summary) {
 module.exports = {
   sendGreetingEmail,
   sendExportNotifyEmail,
+  sendPushNotificationRegistrationEmail,
   sendNotificationResultToAdmin,
 };
 

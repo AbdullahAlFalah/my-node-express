@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mysqlpool = require('../DifferentDatabases/MySQL');
 const authenticateToken = require('../middleware/authenticateToken');
-const { sendExpoNotification } = require('../utils/sendNotificationUtil');
+const sendPushNotificationRegistrationEmail = require('../utils/sendEmail');
 
 // Register push token (with DB)
 router.post('/api/notification/registerPushToken', authenticateToken, (req, res) => {
@@ -40,12 +40,8 @@ router.post('/api/notification/registerPushToken', authenticateToken, (req, res)
                         console.error('DB error:', err);
                         return res.status(500).json({ message: 'Failed to register token' });
                     }
-                    // Send a welcome notification after successful registration
-                    await sendExpoNotification(
-                        email,
-                        "Welcome!",
-                        "You will now receive push notifications."
-                    );
+                    // Send a welcome email after successful registration
+                    await sendPushNotificationRegistrationEmail(email);
                     res.status(200).json({ message: "Push token registered successfully and a notification is send." });
                 }
             );

@@ -43,6 +43,9 @@ async function sendExpoNotificationByToken(token, title, body) {
                 sound: 'default',
                 title,
                 body,
+                channelId: 'default',
+                priority: 'high', // optional, but helps for reliability on Android
+                badge: 0 // optional, can be set if needed
             },
             {
                 headers: {
