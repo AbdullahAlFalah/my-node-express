@@ -30,16 +30,27 @@ router.post('/api/background/upgrade', authenticateToken, async (req, res) => {
           const assetUrl = CDN_URL;
 
           if (owned) {
-            // Already owned: just rotate
-            connection.release();
-            return res.json({
-              success: true,
-              message: `Background rotated to level ${nextLevel}`,
-              newLevel: nextLevel,
-              assetName,
-              assetUrl,
-              owned: true
-            });
+            // Already owned: just rotate by updating only the currentLevel
+            connection.query(
+              `UPDATE user_background_upgrades 
+              SET currentLevel = ?, upgradedAt = NOW()
+              WHERE userId = ?`,
+              [nextLevel, userId],
+              (err) => {
+                connection.release();
+                if (err) {
+                  return res.status(500).json({ success: false, message: 'Error rotating background level.' });
+                }
+                return res.json({
+                  success: true,
+                  message: `Background rotated to level ${nextLevel}`,
+                  newLevel: nextLevel,
+                  assetName,
+                  assetUrl,
+                  owned: true
+                });
+              }
+            );
           } else {
             // 2. Not owned: try to buy
             const upgradeCost = getUpgradeCost(nextLevel);
@@ -91,6 +102,7 @@ router.post('/api/background/upgrade', authenticateToken, async (req, res) => {
                         [userId, nextLevel, 1 << nextLevel], // Last entry sets the bit for the new level
                         (err) => {
                           if (err) {
+                            console.error('Error updating background level:', err); 
                             return connection.rollback(() => {
                               connection.release();
                               res.status(500).json({ success: false, message: 'Error updating background level.' });

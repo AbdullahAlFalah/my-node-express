@@ -42,7 +42,7 @@ router.post('/api/notification/registerPushToken', authenticateToken, (req, res)
                     }
                     // Send a welcome email after successful registration
                     await sendPushNotificationRegistrationEmail(email);
-                    res.status(200).json({ message: "Push token registered successfully and a notification is send." });
+                    res.status(200).json({ message: "Push token registered successfully and an email is sent." });
                 }
             );
 
