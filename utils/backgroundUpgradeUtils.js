@@ -1,8 +1,8 @@
 const mysqlpool = require('../DifferentDatabases/MySQL');
 
 function getUpgradeCost(level) {
-    // Level 1 → 20, Level 2 → 40, Level 3 → 80
-    const costs = [20, 40, 80];
+    // Level 1 → 10, Level 2 → 20, Level 3 → 30
+    const costs = [10, 20, 30];
     return costs[level - 1] || null;
 }
 
