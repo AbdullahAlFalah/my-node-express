@@ -1,3 +1,4 @@
+// Make sure .env is loaded
 require('dotenv').config();
 
 // Imported scheduled jobs

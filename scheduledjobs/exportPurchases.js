@@ -1,26 +1,27 @@
 const { google } = require('googleapis');
 const { Readable } = require('stream');
-const path = require('path');
 const cron = require('node-cron');
 const ExcelJS = require('exceljs');
 const mysqlpool = require('../DifferentDatabases/MySQL');
 const { sendExportNotifyEmail } = require('../utils/sendEmail');
 
-// Load your service account key
-const KEYFILEPATH = path.join(__dirname, '../Keys/service-account.json');
-const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
+// Load your OAuth2 client credentials
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
+const REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN;
 
 // Configuration constants
 const CRON_SCHEDULE = '0 0 1 * *'; // Runs once per month on the 1st at midnight (cron format: minute hour dayOfMonth month dayOfWeek)
 const MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const WORKSHEET_NAME = 'Purchases';
 
-const auth = new google.auth.GoogleAuth({
-  keyFile: KEYFILEPATH,
-  scopes: SCOPES,
-});
+// Create OAuth2 client with refresh token
+const oAuth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+oAuth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
 
-const drive = google.drive({ version: 'v3', auth });
+// Google Drive API client
+const drive = google.drive({ version: 'v3', auth: oAuth2Client });
 
 /**
  * Create Excel workbook in memory and upload directly to Drive
@@ -86,7 +87,6 @@ async function exportPurchasesToDrive(purchases) {
         mimeType: MIME_TYPE,
         body: stream
     };
-
                
     const response = await drive.files.create({
         resource: fileMetadata,
