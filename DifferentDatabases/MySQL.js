@@ -10,7 +10,6 @@ const mysqlpool = mysql.createPool({
   database: process.env.MYSQL_DATABASE,
   port: parseInt(process.env.MYSQL_PORT, 10),
   ssl: { ca: fs.readFileSync(process.env.MYSQL_SSL_CA) }, //path to Aiven's CA certificate
-  connectionLimit: 10,
   waitForConnections: true,
 });
 

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { runDbQuery } = require('../utils/mySqlQuery');
 const mysqlpool = require('../DifferentDatabases/MySQL');
 const authenticateToken = require('../middleware/authenticateToken');
 const { getUpgradeCost, getNextLevel, isLevelOwned } = require('../utils/backgroundUpgradeUtils'); 
@@ -7,137 +8,116 @@ const { getUpgradeCost, getNextLevel, isLevelOwned } = require('../utils/backgro
 router.post('/api/background/upgrade', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
 
+  let connection;
+  let transactionStarted = false;
+
   try {
 
+    // Step 1: figure out next level and it's ownership
     const { nextLevel } = await getNextLevel(userId); // Get next level in the rotation
     const owned = await isLevelOwned(userId, nextLevel); // Check if owned
 
-    mysqlpool.getConnection((err, connection) => {
-      if (err) {
-        return res.status(500).json({ success: false, message: 'Database connection error' });
-      }
+    // Step 2: Fetch asset info for next level
+    const assetResults = await runDbQuery(
+      'SELECT assetName, CDN_URL FROM background_upgrades_assets WHERE level = ?',
+      [nextLevel]
+    );
 
-      // 1. Fetch asset info for next level
-      connection.query(
-        'SELECT assetName, CDN_URL FROM background_upgrades_assets WHERE level = ?',
-        [nextLevel],
-        async (err, assetResults) => {
-          if (err || assetResults.length === 0) {
-              connection.release();
-              return res.status(500).json({ success: false, message: 'Asset not found for this level.' });
-          }
-          const { assetName, CDN_URL } = assetResults[0];
-          const assetUrl = CDN_URL;
+    if (assetResults.length === 0) {
+      return res.status(404).json({ success: false, message: 'Asset not found for this level.' }); // 404: Not Found
+    }
 
-          if (owned) {
-            // Already owned: just rotate by updating only the currentLevel
-            connection.query(
-              `UPDATE user_background_upgrades 
-              SET currentLevel = ?, upgradedAt = NOW()
-              WHERE userId = ?`,
-              [nextLevel, userId],
-              (err) => {
-                connection.release();
-                if (err) {
-                  return res.status(500).json({ success: false, message: 'Error rotating background level.' });
-                }
-                return res.json({
-                  success: true,
-                  message: `Background rotated to level ${nextLevel}`,
-                  newLevel: nextLevel,
-                  assetName,
-                  assetUrl,
-                  owned: true
-                });
-              }
-            );
-          } else {
-            // 2. Not owned: try to buy
-            const upgradeCost = getUpgradeCost(nextLevel);
-            connection.query(
-              'SELECT totalCoins FROM rewards WHERE userId = ? ORDER BY createdAt DESC LIMIT 1',
-              [userId],
-              (err, coinResults) => {
-                if (err) {
-                  connection.release();
-                  return res.status(500).json({ success: false, message: 'Error fetching coin balance' });
-                }
-                const totalCoins = coinResults.length > 0 ? coinResults[0].totalCoins : 0;
-                if (totalCoins < upgradeCost) {
-                  connection.release();
-                  return res.status(400).json({
-                    success: false,
-                    message: 'Not enough coins to unlock this background.',
-                    required: upgradeCost,
-                    current: totalCoins
-                  });
-                }
-                // Transaction to ensure atomicity:                                                                         
-                connection.beginTransaction(err => {
-                  if (err) {
-                    connection.release();
-                    return res.status(500).json({ success: false, message: 'Transaction error' });
-                  }
-                  const newTotalCoins = totalCoins - upgradeCost;
-                  // 3. Deduct coins: insert new reward record with updated total
-                  connection.query(
-                    'INSERT INTO rewards (userId, rewardCoins, totalCoins) VALUES (?, ?, ?)',
-                    [userId, -upgradeCost, newTotalCoins],
-                    (err) => {
-                      if (err) {
-                        return connection.rollback(() => {
-                          connection.release();
-                          res.status(500).json({ success: false, message: 'Error deducting coins.' });
-                        });
-                      }
-                      // 4. Insert or update user's background level 
-                      connection.query(
-                        `INSERT INTO user_background_upgrades 
-                          (userId, currentLevel, ownedLevels, upgradedAt) 
-                        VALUES (?, ?, ?, NOW()) 
-                        ON DUPLICATE KEY UPDATE 
-                          currentLevel = VALUES(currentLevel), 
-                          ownedLevels = ownedLevels | VALUES(ownedLevels),
-                          upgradedAt = NOW()`,
-                        [userId, nextLevel, 1 << nextLevel], // Last entry sets the bit for the new level
-                        (err) => {
-                          if (err) {
-                            console.error('Error updating background level:', err); 
-                            return connection.rollback(() => {
-                              connection.release();
-                              res.status(500).json({ success: false, message: 'Error updating background level.' });
-                            });
-                          }
-                          connection.commit(err => {
-                            connection.release();
-                            if (err) {
-                              return res.status(500).json({ success: false, message: 'Error committing transaction.' });
-                            }
-                            res.json({
-                              success: true,
-                              message: `Background unlocked and rotated to level ${nextLevel}!`,
-                              newLevel: nextLevel,
-                              assetName,
-                              assetUrl,
-                              owned: true,
-                              remainingCoins: newTotalCoins
-                            });
-                          });
-                        }
-                      );
-                    }
-                  );
-                });                 
-              }
-            );
-          }
-        }
+    const { assetName, CDN_URL: assetUrl } = assetResults[0];
+
+    if (owned) {
+      // Already owned: just rotate by updating only the currentLevel
+      await runDbQuery(
+        `UPDATE user_background_upgrades 
+        SET currentLevel = ?, upgradedAt = NOW()
+        WHERE userId = ?`,
+        [nextLevel, userId]
       );
+
+      return res.json({
+        success: true,
+        message: `Background rotated to level ${nextLevel}`,
+        newLevel: nextLevel,
+        assetName,
+        assetUrl,
+        owned: true
+      });
+    }
+
+    // Step 3: Not owned: try to buy
+    const upgradeCost = getUpgradeCost(nextLevel);
+
+    // Get current coins
+    const coinResults = await runDbQuery(
+      'SELECT totalCoins FROM rewards WHERE userId = ? ORDER BY createdAt DESC LIMIT 1',
+      [userId]
+    );
+
+    const totalCoins = coinResults.length > 0 ? coinResults[0].totalCoins : 0;
+
+    if (totalCoins < upgradeCost) {
+      return res.status(400).json({
+        success: false,
+        message: 'Not enough coins to unlock this background.',
+        required: upgradeCost,
+        current: totalCoins
+      }); // 400 Bad Request
+    }
+
+    // Start transaction here to ensure atomicity for sensitive changes
+    // Begin transaction for purchase using connection directly and flag it
+    connection = await mysqlpool.promise().getConnection();
+    await connection.beginTransaction();
+    transactionStarted = true;
+
+    const newTotalCoins = totalCoins - upgradeCost; // The new updated total
+
+    // Step 4: Deduct coins by inserting new reward record with updated total
+    await connection.query(
+      'INSERT INTO rewards (userId, rewardCoins, totalCoins) VALUES (?, ?, ?)',
+      [userId, -upgradeCost, newTotalCoins]
+    );
+    
+    // Step 5: Insert or update user's background level and commit
+    await connection.query(
+      `INSERT INTO user_background_upgrades 
+        (userId, currentLevel, ownedLevels, upgradedAt) 
+      VALUES (?, ?, ?, NOW()) 
+      ON DUPLICATE KEY UPDATE 
+        currentLevel = VALUES(currentLevel), 
+        ownedLevels = ownedLevels | VALUES(ownedLevels),
+        upgradedAt = NOW()`,
+        [userId, nextLevel, 1 << nextLevel] // Last entry sets the bit for the new level
+    );
+    await connection.commit();
+
+    return res.json({
+      success: true,
+      message: `Background unlocked and rotated to level ${nextLevel}!`,
+      newLevel: nextLevel,
+      assetName,
+      assetUrl,
+      owned: true,
+      remainingCoins: newTotalCoins
     });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Unexpected error', error: error.message });
+    if (connection && transactionStarted) await connection.rollback();
+
+    console.error('[BackgroundUpgrade] Error: ', error); // Server logs
+    return res.status(500).json({
+      success: false,
+      ServerNote: "Internal server error while upgrading background!"
+    }); // 500: Internal Server Error
+
+  } finally {
+    if (connection) connection.release();
   }
+    
 });
 
 module.exports = router;
-

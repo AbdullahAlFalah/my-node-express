@@ -13,6 +13,8 @@ const bcrypt = require('bcrypt');
 
 const pgsqlpool = require('./DifferentDatabases/postgreSQL');
 const mysqlpool = require('./DifferentDatabases/MySQL');
+const { runDbQuery } = require('./utils/mySqlQuery');
+const { runPgQuery } = require('./utils/pgQuery');
 
 // Imported custom middlewares
 const authenticateToken = require('./middleware/authenticateToken');
@@ -55,7 +57,7 @@ mysqlpool.getConnection((err, mysqlclient) => {
   mysqlclient.release(); // ✅ Good practice, but not critical for a one-time test
 });
 
-// Connect to PostgreSQL
+// Connect to PostgreSQL for testing purposes
 pgsqlpool.connect((err, pgclient, release) => {
 
   if (err) {
@@ -86,107 +88,86 @@ app.post(`/api/users/signup`, async (req, res) => {
     // Hash the password using bcrypt
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    mysqlpool.getConnection((err, connection) => {
-      if (err) {
-        console.error('Error getting MySQL connection: ' + err.stack);
-        return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-      }
+    // Insert user
+    await runDbQuery(
+      'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
+      [username, email, hashedPassword]
+    );
 
-      connection.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword], (err, result) => {
-        if (err) {
-          console.error('Error executing query: ' + err.stack);
-          // Check for duplicate email error
-          if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ServerNote: 'Email already exists!'}); // 409 Conflict: The request could not be completed due to a conflict with the current state of the resource.         
-          }
-          return res.status(500).json({ServerNote: 'Error creating user'}); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.        
-        }
-        connection.release(); // Release the connection back to the pool
-        // Send greeting email (don't block response on error)
-        sendGreetingEmail(email, username)
-          .then(() => console.log(`Greeting email sent to ${email}`))
-          .catch(e => console.error('Failed to send greeting email:', e.message));
-        res.status(201).json({ServerNote: 'User created successfully'}); // 201 Created: The request has succeeded, and a new resource was created, often used for successful POST requests.
-      });
+    // Send greeting email asynchronously (don't block on error)
+    sendGreetingEmail(email, username)
+      .then(() => console.log(`[Email] Greeting sent to ${email}`))
+      .catch(e => console.error(`[Email] Failed to send greeting: ${e.message}`));
 
-    });
+    res.status(201).json({ ServerNote: 'User created successfully' });
 
   } catch (error) {
-    console.error('Error hashing password: ' + error.message);
-    res.status(500).json({ ServerNote: 'Internal server error!!!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+    // Duplicate email
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ ServerNote: 'Email already exists!' });
+    }
+    res.status(500).json({ ServerNote: 'Internal server error while signing-up!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
   }
 
 });
 
 // Login with an existing user route (Signing-in)
-app.post(`/api/users/login`, (req, res) => {
+app.post(`/api/users/login`, async (req, res) => {
   const { email, password } = req.body;
+    
+  try {
 
-  mysqlpool.getConnection((err, connection) => {
-    if (err) {
-      console.error('Error getting MySQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+    // Fetch user
+    const results = await runDbQuery('SELECT * FROM users WHERE email = ?', [email]);
+
+    if (results.length === 0) {
+      return res.status(401).json({ServerNote: 'User not found!'}); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
     }
 
-    connection.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
-      if (err) {
-        console.error('Error executing query: ' + err.stack);
-        return res.status(500).json({ServerNote: 'Server connection error!!'}); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-      }
+    const user = results[0];
 
-      if (results.length === 0) {
-        return res.status(401).json({ServerNote: 'User not found!'}); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
-      }
+    // Compare the provided password with the hashed password in the database
+    const isPasswordValid = await bcrypt.compare(password, user.password);      
+    if (!isPasswordValid) { // user.password !== password can be used if password is not hashed
+      return res.status(401).json({ServerNote: 'Invalid password!'}); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
+    }
 
-      const user = results[0];
+    // Generate a JWT token
+    const token = jwt.sign({ userId: user.idUsers}, SECRET_KEY, { expiresIn: '24h' }); // userId: user.idUsers, can be used if userId is not hashed
 
-      // Compare the provided password with the hashed password in the database
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-      
-      if (!isPasswordValid) { // user.password !== password can be used if password is not hashed
-        return res.status(401).json({ServerNote: 'Invalid password!'}); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
-      }
+    res.status(200).json({ ServerNote: 'Logging-in has been successful', token, }); //200 OK: The request succeeded, and the server is returning the requested resource.
 
-      // Generate a JWT token
-      const token = jwt.sign({ userId: user.idUsers}, SECRET_KEY, { expiresIn: '24h' }); // userId: user.idUsers, can be used if userId is not hashed
-      connection.release(); // Release the connection back to the pool
-      res.status(200).json({ ServerNote: 'Logging-in has been successful', token, }); //200 OK: The request succeeded, and the server is returning the requested resource.
-    });
-
-  });
+  } catch (error) {
+    res.status(500).json({ ServerNote: 'Internal server error while logging-in!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+  }
 
 });
 
 // Protected route: Get all user info based on email route
-app.get(`/api/users/getuserinfo`, authenticateToken, (req, res) => {
+app.get(`/api/users/getuserinfo`, authenticateToken, async (req, res) => {
   const email = req.query.email; // Access email from the query parameters
 
-  mysqlpool.getConnection((err, connection) => {
-    if (err) {
-      console.error('Error getting MySQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-    }
-  
-    connection.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
-      if (err) {
-        console.error('Error executing query: ' + err.stack);
-        return res.status(500).json({ServerNote: 'Error fetching user info!'}); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-      }
-      if (results.length === 0) {
-        return res.status(404).json({ServerNote: 'User not found!'}); // 404 Not Found: The server can not find the requested resource.
-      }
-      connection.release(); // Release the connection back to the pool
-      res.status(200).json({ServerNote: 'User info fetched!!!',
-        data: results,
-      }); // 200 OK: The request succeeded, and the server is returning the requested resource. 
-    });
+  try {
 
-  });
+    const results = await runDbQuery('SELECT * FROM users WHERE email = ?', [email]);
+
+    if (results.length === 0) {
+      return res.status(404).json({ServerNote: 'User not found!'}); // 404 Not Found: The server can not find the requested resource.
+    }
+
+    res.status(200).json({
+      ServerNote: 'User info fetched!!!',
+      data: results,
+    }); // 200 OK: The request succeeded, and the server is returning the requested resource.
+
+  } catch (error) {
+    res.status(500).json({ ServerNote: 'Internal server error while fetching user!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+  }
 
 });
 
 // Reset a user's password route based on userId
-app.put(`/api/users/resetpassword/:id`, (req, res) => {
+app.put(`/api/users/resetpassword/:id`, async (req, res) => {
   const userId = req.params.id;
   const { oldPassword, newPassword } = req.body;
 
@@ -194,127 +175,84 @@ app.put(`/api/users/resetpassword/:id`, (req, res) => {
     return res.status(400).json({ ServerNote: 'Old and new passwords are required!' }); // 400 Bad Request: The server cannot or will not process the request due to a client error (e.g., malformed request syntax, invalid request message framing, or deceptive request routing).
   }
 
-  mysqlpool.getConnection((err, connection) => {
-    if (err) {
-      console.error('Error getting MySQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-    }
+  try {
 
     // First, get the user's current password
-    connection.query('SELECT password FROM users WHERE idUsers = ?', [userId], (err, result) => {
-      if (err) {
-        console.error('Error fetching old password: ' + err.stack);
-        return res.status(500).json({ ServerNote: 'Server error fetching old password!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-      }
+    const results = await runDbQuery('SELECT password FROM users WHERE idUsers = ?', [userId]);
 
-      if (result.length === 0) {
-        return res.status(404).json({ ServerNote: 'User not found!' }); // 404 Not Found: The server can not find the requested resource.
-      }
+    if (results.length === 0) {
+      return res.status(404).json({ ServerNote: 'User not found!' }); // 404 Not Found: The server can not find the requested resource.
+    }
 
-      const storedPassword = result[0].password;
+    const storedPassword = results[0].password;
+    // Check if the old password matches
+    if (storedPassword !== oldPassword) {
+      return res.status(401).json({ ServerNote: 'Incorrect old password!' }); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
+    }
 
-      // Check if the old password matches
-      if (storedPassword !== oldPassword) {
-        return res.status(401).json({ ServerNote: 'Incorrect old password!' }); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
-      }
+    // If the old password matches, update to the new password
+    await runDbQuery('UPDATE users SET password = ? WHERE idUsers = ?', [newPassword, userId]);
 
-      // If the old password matches, update to the new password
-      connection.query('UPDATE users SET password = ? WHERE idUsers = ?', [newPassword, userId], (err, result) => {
-        if (err) {
-          console.error('Error executing query: ' + err.stack);
-          res.status(500).json({ ServerNote: 'Error resetting password!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-          return;
-        }
-        res.status(200).json({ ServerNote: 'Password reset successfully!' }); // 200 OK: The request succeeded, and the server is returning the requested resource.
-      });
-
-      connection.release(); // Release the connection back to the pool
-    });
-
-  });
+    res.status(200).json({ ServerNote: 'Password reset successfully!' });
+      
+  } catch (error) {
+    res.status(500).json({ ServerNote: 'Internal server error while reseting password!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+  }
 
 });
 
 // Update an existing user route 
-app.put(`/api/users/updateuserinfo/:id`, (req, res) => {
+app.put(`/api/users/updateuserinfo/:id`, async (req, res) => {
   const { username, email } = req.body;
   const userId = req.params.id;
 
-  mysqlpool.getConnection((err, connection) => {
-    if (err) {
-      console.error('Error getting MySQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-    }
+  try {
 
-    connection.query('UPDATE users SET username = ?, email = ? WHERE idUsers = ?', [username, email, userId], (err, result) => {
-      if (err) {
-        console.error('Error executing query: ' + err.stack);
-        res.status(500).json({ServerNote: 'Error updating user!'}); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-        return;
-      }
-      connection.release(); // Release the connection back to the pool
-      res.status(200).json({ServerNote: 'User updated successfully!!!'}); // 200 OK: The request succeeded, and the server is returning the requested resource.
-    });
+    await runDbQuery('UPDATE users SET username = ?, email = ? WHERE idUsers = ?', [username, email, userId]);
 
-  });
+    res.status(200).json({ ServerNote: 'User updated successfully!!!' }); // 200 OK: The request succeeded, and the server is returning the requested resource.
+
+  } catch (err) {
+    res.status(500).json({ ServerNote: 'Internal server error while updating user!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+  }
 
 });
 
 // Delete a user route
-app.delete(`/api/users/deleteuserinfo/:id`, (req, res) => {
+app.delete(`/api/users/deleteuserinfo/:id`, async (req, res) => {
   const userId = req.params.id;
 
-  mysqlpool.getConnection((err, connection) => {
-    if (err) {
-      console.error('Error getting MySQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-    }
+  try {
 
-    connection.query('DELETE FROM users WHERE idUsers = ?', [userId], (err, result) => {
-      if (err) {
-        console.error('Error executing query: ' + err.stack);
-        res.status(500).json({ServerNote: 'Error deleting user!'}); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-        return;
-      }
-      connection.release(); // Release the connection back to the pool
-      res.status(200).json({ServerNote: 'User deleted successfully!!!'}); // 200 OK: The request succeeded, and the server is returning the requested resource.
-    });
+    await runDbQuery('DELETE FROM users WHERE idUsers = ?', [userId]);
 
-  });
+    res.status(200).json({ ServerNote: 'User deleted successfully!!!' }); // 200 OK: The request succeeded, and the server is returning the requested resource.
+
+  } catch (err) {
+    res.status(500).json({ ServerNote: 'Internal server error while deleting user!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+  }
 
 });
 
 // PostgreSQL Routes:
 // Get all films info route
-app.get(`/api/films/getfilmsinfo`, authenticateToken, (req, res) => {
+app.get(`/api/films/getfilmsinfo`, authenticateToken, async (req, res) => {
   const query = `SELECT film_id, title, description, length, replacement_cost, rating FROM film LIMIT 10`;
 
-  pgsqlpool.connect((err, client, release) => {
-    if (err) {
-      console.error('Error getting PostgreSQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-    }
-
-    client.query(query, (err, result) => {
-      release(); // Release the connection back to the pool
-      if (err) {
-        console.error('Error executing query: ' + err.stack);
-        return res.status(500).json({ ServerNote: 'Error fetching films!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-      }
-
+    try {
+      const results = await runPgQuery(query);
       res.status(200).json({
         ServerNote: 'Films fetched successfully!',
-        data: result.rows, // Return the rows from the query result
+        data: results, // Return the rows from the query result (this is done now inside the runPgQuery function).
       }); // 200 OK: The request succeeded, and the server is returning the requested resource.
-
-    });
-
-  });
+    } catch (error) {        
+      return res.status(500).json({ ServerNote: 'Error fetching films!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+    }
 
 });
 
 // Route to fetch actors related to a specific film
-app.get(`/api/films/:film_id/actors`, authenticateToken, (req, res) => {
+app.get(`/api/films/:film_id/actors`, authenticateToken, async (req, res) => {
   const filmId = req.params.film_id; // Get the film_id from the route parameter
 
   const query = `
@@ -330,27 +268,15 @@ app.get(`/api/films/:film_id/actors`, authenticateToken, (req, res) => {
       fa.film_id = $1
   `;
 
-  pgsqlpool.connect((err, client, release) => {
-    if (err) {
-      console.error('Error getting PostgreSQL connection: ' + err.stack);
-      return res.status(500).json({ ServerNote: 'Database connection error!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-    }
-
-    client.query(query, [filmId], (err, result) => {
-      release(); // Release the connection back to the pool       
-      if (err) {
-        console.error('Error executing query: ' + err.stack);
-        return res.status(500).json({ ServerNote: 'Error fetching actors for the film!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
-      }
-
+    try {
+      const results = await runPgQuery(query, [filmId]);
       res.status(200).json({
         ServerNote: 'Actors fetched successfully!',
-        data: result.rows, // Return the rows from the query result
+        data: results, // Return the rows from the query result (this is done now inside the runPgQuery function).
       }); // 200 OK: The request succeeded, and the server is returning the requested resource.
-    
-    });
-
-  });
+    } catch (error) {
+      return res.status(500).json({ ServerNote: 'Error fetching actors for the film!' }); // 500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.
+    }
 
 });
 

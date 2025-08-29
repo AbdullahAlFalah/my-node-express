@@ -8,84 +8,102 @@ router.post('/purchase/purchaseitems', authenticateToken, async (req, res) => {
   const userId = req.user.userId; // Adjust according to the JWT payload
   const { items, currency = 'USD' } = req.body; // allow currency override, default to USD for testing
 
+  // Input validation to ensure it is an array of items
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ success: false, ServerNote: "No items provided to purchase!" }); // 400: Bad Request
+  }
+
+  // Validate the cost of each item
+  for (const item of items) {
+    if (typeof item.cost !== 'number' || item.cost <= 0) {
+      return res.status(400).json({ 
+        success: false, 
+        ServerNote: "Invalid item cost provided!" 
+      }); // 400: Bad Request
+    }
+  }
+
   // Calculate total cost
   const totalCost = items.reduce((sum, item) => sum + item.cost, 0);
 
+  let connection;
+
   // Start MySQL transaction
-  mysqlpool.getConnection((err, connection) => {
-    if (err) {
-      console.error('Error getting MySQL connection: ' + err.stack);
-      return res.status(500).json({ success: false, ServerNote: "Database connection error!" }); // 500: Internal Server Error
+  try {
+    connection = await mysqlpool.promise().getConnection();
+    await connection.beginTransaction();
+
+    // Step 1: Fetch wallet
+    const [walletResults] = await connection.query(
+      'SELECT balance, currency, status FROM wallets WHERE userId = ?',
+      [userId]
+    );
+
+    if (walletResults.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, ServerNote: "Wallet not found!" }); // 404: Not Found
     }
 
-    connection.beginTransaction(async (err) => {
-      if (err) {
-        connection.release();
-        return res.status(500).json({ success: false, ServerNote: "Transaction error!" }); // 500: Internal Server Error
-      }
+    const { balance, currency: walletCurrency, status: walletStatus } = walletResults[0];
 
-      // Fetch wallet 
-      connection.query('SELECT balance, currency, status FROM wallets WHERE userId = ?', [userId], (err, results) => {
-        if (err) {
-          connection.rollback(() => connection.release());
-          return res.status(500).json({ success: false, ServerNote: "Fetching wallet failed!" }); // 500: Internal Server Error
-        }
+    if (walletStatus !== 'active') {
+      await connection.rollback();
+      return res.status(403).json({ success: false, ServerNote: "Wallet is not active!" }); // 403: Forbidden (valid token, but not allowed)
+    }
 
-        if (results.length === 0) {
-          connection.rollback(() => connection.release());
-          return res.status(404).json({ success: false, ServerNote: "Wallet not found!" }); // 404: Not Found
-        }
+    console.log(`[Purchase] Debug: Wallet balance: ${balance}, Total cost: ${totalCost}`);
 
-        const balance = results[0].balance;
-        const walletCurrency = results[0].currency;
-        const walletStatus = results[0].status;
+    if (walletCurrency !== currency) {
+      await connection.rollback();
+      return res.status(400).json({ success: false, ServerNote: `Wallet currency mismatch: expected ${walletCurrency}` }); // 400: Bad Request
+    }
 
-        if (walletStatus !== 'active') {
-          connection.rollback(() => connection.release());
-          return res.status(403).json({ success: false, ServerNote: "Wallet is not active!" }); // 403: Forbidden (valid token, but not allowed)
-        }
+    if (balance < totalCost) {
+      await connection.rollback();
+      return res.status(400).json({ success: false, ServerNote: "Insufficient funds" }); // 400: Bad Request
+    }
 
-        if (walletCurrency !== currency) {
-          connection.rollback(() => connection.release());
-          return res.status(400).json({ success: false, ServerNote: `Wallet currency mismatch: expected ${walletCurrency}` }); // 400: Bad Request
-        }
-        
-        console.log(`DEBUG: Wallet balance: ${balance}, Total cost: ${totalCost}`);
+    // Step 2: Deduct balance
+    await connection.query(
+      'UPDATE wallets SET balance = balance - ? WHERE userId = ?',
+      [totalCost, userId]
+    );
 
-        if (balance < totalCost) {
-          connection.rollback(() => connection.release());
-          return res.status(400).json({ success: false, ServerNote: "Insufficient funds" }); // 400: Bad Request
-        }
+    // Step 3: Save purchase record
+    const purchaseData = { 
+      userId, 
+      items: JSON.stringify(items), 
+      totalCost, 
+      currency, 
+      status: 'completed' 
+    };
+    await connection.query('INSERT INTO purchases SET ?', purchaseData);
 
-        // Deduct wallet
-        connection.query('UPDATE wallets SET balance = balance - ? WHERE userId = ?', [totalCost, userId], (err) => {
-          if (err) {
-            connection.rollback(() => connection.release());
-            return res.status(500).json({ success: false, ServerNote: "Failed to deduct wallet" }); // 500: Internal Server Error
-          }
+    // Step 4: Fetch updated balance and commit
+    const [updatedWallet] = await connection.query(
+      'SELECT balance FROM wallets WHERE userId = ?',
+      [userId]
+    );
+    await connection.commit();
 
-          // Save purchase record
-          const purchaseData = { userId, items: JSON.stringify(items), totalCost, currency, status: 'completed' };
-          connection.query('INSERT INTO purchases SET ?', purchaseData, (err) => {
-            if (err) {
-              connection.rollback(() => connection.release());
-              return res.status(500).json({ success: false, ServerNote: "Failed to save purchase" }); // 500: Internal Server Error
-            }
+    return res.status(200).json({
+      success: true,
+      ServerNote: `Purchase successful! Your new balance is ${updatedWallet[0].balance}`
+    }); // 200: OK
 
-            connection.commit((err) => {
-              if (err) {
-                connection.rollback(() => connection.release()); // Rollback transaction on commit error
-                return res.status(500).json({ success: false, ServerNote: "Commit failed" }); // 500: Internal Server Error
-              }
-              connection.release();
-              return res.status(200).json({ success: true, ServerNote: `Your new balance now is: ${balance - totalCost}` }); // 200: OK
-            });
-          });
-        });
-      });
-    });
-  });
+  } catch (error) {
+    if (connection) await connection.rollback();
+
+    console.error('[Purchase] Error: ', error); // Server logs
+    return res.status(500).json({
+      success: false,
+      ServerNote: "Internal server error during purchase!"
+    }); // 500: Internal Server Error 
+
+  } finally {
+    if (connection) connection.release();
+  }
+
 });
 
 module.exports = router;
-
