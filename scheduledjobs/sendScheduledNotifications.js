@@ -5,7 +5,7 @@ const { runDbQuery } = require('../utils/mySqlQuery');
 
 // Configuration constants
 // Schedule expressions for cron jobs
-const Notification_CRON = '0 * * * *'; // Runs once every hour at 00 minutes (cron format: minute hour dayOfWeek Week dayOfWeek)
+const Notification_CRON = '0 */6 * * *'; // Runs once every 6 hour at 00 minutes (00:00, 06:00, 12:00, 18:00) (cron format: minute hour dayOfWeek Week dayOfWeek)
 const Email_CRON = '30 0 * * 1'; // Runs once every week at 12:30 A.M every Monday (cron format: minute hour dayOfWeek Week dayOfWeek)
 
 // Send notification to all users by token

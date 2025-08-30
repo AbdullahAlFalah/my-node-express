@@ -9,28 +9,22 @@ const mysqlpool = require('../DifferentDatabases/MySQL');
  * @returns {Promise<{success: boolean, message: string, data?: any}>}
  */
 async function sendExpoNotification(email, title, body) {
-    return new Promise((resolve, reject) => {
-        mysqlpool.query(
+    try {
+        const results = await runDbQuery(
             'SELECT expoPushToken FROM user_push_tokens WHERE email = ?',
-            [email],
-            async (err, results) => {
-
-                if (err) {
-                    console.error('DB error:', err);
-                    return resolve({ success: false, message: 'Failed to fetch token' });
-                }
-                
-                if (!results.length) {
-                    return resolve({ success: false, message: 'User not registered' });
-                }
-
-                const token = results[0].expoPushToken;
-                resolve(await sendExpoNotificationByToken(token, title, body));
-            }
+            [email]
         );
-    });
-}
 
+        if (!results.length) {
+            return { success: false, message: 'User not registered' };
+        }
+
+        const token = results[0].expoPushToken;
+        return await sendExpoNotificationByToken(token, title, body);
+    } catch (error) {
+        return { success: false, message: 'Failed to fetch token' };
+    }
+}
 
 /**
  * Sends an Expo push notification directly to a token.
@@ -65,4 +59,3 @@ async function sendExpoNotificationByToken(token, title, body) {
 }
 
 module.exports = { sendExpoNotification, sendExpoNotificationByToken };
-
