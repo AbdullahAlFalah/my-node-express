@@ -177,7 +177,7 @@ app.put(`/api/users/resetpassword/:id`, async (req, res) => {
 
   try {
 
-    // First, get the user's current password
+    // First, get the user's current password hash
     const results = await runDbQuery('SELECT password FROM users WHERE idUsers = ?', [userId]);
 
     if (results.length === 0) {
@@ -185,13 +185,24 @@ app.put(`/api/users/resetpassword/:id`, async (req, res) => {
     }
 
     const storedPassword = results[0].password;
-    // Check if the old password matches
-    if (storedPassword !== oldPassword) {
-      return res.status(401).json({ ServerNote: 'Incorrect old password!' }); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
+
+    // Compare the current password with the stored hashed password
+    const isPasswordValid = await bcrypt.compare(oldPassword, storedPassword);
+    if (!isPasswordValid) {
+      return res.status(401).json({ ServerNote: 'Incorrect current password!' }); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
     }
 
-    // If the old password matches, update to the new password
-    await runDbQuery('UPDATE users SET password = ? WHERE idUsers = ?', [newPassword, userId]);
+    // Compare the new password with the stored hashed password to ensure they are different
+    const isNewPasswordSameAsOld = await bcrypt.compare(newPassword, storedPassword);
+    if (isNewPasswordSameAsOld) {
+      return res.status(400).json({ ServerNote: 'New password must be different from the old password!' }); // 400 Bad Request: The server cannot or will not process the request due to a client error (e.g., malformed request syntax, invalid request message framing, or deceptive request routing).
+    }
+
+    // If the old password matches (verification successful): 
+    // Hash the new password
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    // Update to the new hashed password
+    await runDbQuery('UPDATE users SET password = ? WHERE idUsers = ?', [hashedNewPassword, userId]);
 
     res.status(200).json({ ServerNote: 'Password reset successfully!' });
       
