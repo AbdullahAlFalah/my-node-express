@@ -60,8 +60,8 @@ oAuth2Client.on('tokens', (tokens) => {
 if (!fs.existsSync(TOKEN_PATH)) {
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
+    prompt: 'consent',
     scope: SCOPES,
-    code_challenge_method: null, // disable code verifier generation
   });
   console.log('Open this URL in your browser to authorize the app manually for the first time only:');
   console.log(authUrl);

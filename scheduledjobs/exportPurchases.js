@@ -1,3 +1,7 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+const fs = require('fs');
+
 const { google } = require('googleapis');
 const { Readable } = require('stream');
 const cron = require('node-cron');
@@ -9,16 +13,33 @@ const { sendExportNotifyEmail } = require('../utils/sendEmail');
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
-const REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN;
+const TOKEN_PATH = path.join(__dirname, '../Keys/token.json');
 
 // Configuration constants
 const CRON_SCHEDULE = '0 0 1 * *'; // Runs once per month on the 1st at midnight (cron format: minute hour dayOfMonth month dayOfWeek)
 const MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const WORKSHEET_NAME = 'Purchases';
 
-// Create OAuth2 client with refresh token
+// Load the full token object from token.json
+if (!fs.existsSync(TOKEN_PATH)) {
+  throw new Error('token.json not found! Run your auth script first!');
+}
+const tokenRaw = fs.readFileSync(TOKEN_PATH, 'utf8');
+const token = JSON.parse(tokenRaw);
+
+console.log({ CLIENT_ID, CLIENT_SECRET, REDIRECT_URI });
+
+// Create OAuth2 client with the full token
 const oAuth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
-oAuth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
+oAuth2Client.setCredentials(token);
+
+// Listen for token refreshes and save them automatically
+oAuth2Client.on('tokens', (tokens) => {
+  if (tokens.refresh_token) {
+    fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2));
+    console.log('Refreshed token saved!');
+  }
+});
 
 // Google Drive API client
 const drive = google.drive({ version: 'v3', auth: oAuth2Client });
@@ -139,4 +160,26 @@ cron.schedule(CRON_SCHEDULE, async () => {
 
 });
 
+{/*
+    
+// Create a small test file
+const content = 'Hello Drive! This is a test.';
+const bufferStream = new Readable();
+bufferStream.push(Buffer.from(content));
+bufferStream.push(null);
 
+// For testing upload only
+(async () => {
+  try {
+    const response = await drive.files.create({
+      resource: { name: `test_upload_${Date.now()}.txt`, parents: [process.env.GOOGLE_DRIVE_FOLDER_ID] },
+      media: { mimeType: 'text/plain', body: bufferStream },
+      fields: 'id',
+    });
+    console.log('✅ Test file uploaded successfully. File ID:', response.data.id);
+  } catch (err) {
+    console.error('❌ Upload failed:', err);
+  }
+})();
+
+*/}
