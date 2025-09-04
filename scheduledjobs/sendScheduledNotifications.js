@@ -41,10 +41,10 @@ async function sendToAllTokens(title, body) {
 
 // Scheduled job to send notifications to all users every hour
 cron.schedule(Notification_CRON, async () => {
-    // This runs at minute 0 of every hour
-    console.log('[CRON] Hourly notification job started...');
+    // This runs at minute 0 of every 6 hours
+    console.log('[CRON] Notification job started...');
     try {
-        const { allSuccess } = await sendToAllTokens('Hourly Reminder', 'This is your Hourly notification!');
+        const { allSuccess } = await sendToAllTokens('Friendly Reminder', 'This is your friendly notification!');
 
         if (allSuccess) {
             console.log('[CRON] ✅ All hourly notifications were sent successfully!!!');
