@@ -15,8 +15,8 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs'); // Swap bcrypt for bcryptjs. It is a pure JavaScript version that doesn't require compilation and works perfectly on Vercel.
 
-const pgsqlpool = require('../DifferentDatabases/vercelPostgreSQL');
-const mysqlpool = require('../DifferentDatabases/vercelMySQL');
+// const pgsqlpool = require('../DifferentDatabases/vercelPostgreSQL');
+// const mysqlpool = require('../DifferentDatabases/vercelMySQL');
 const { runDbQuery } = require('../utils/mySqlQuery');
 const { runPgQuery } = require('../utils/pgQuery');
 
@@ -35,7 +35,7 @@ const sendRemoteNotifications = require('../routes/sendRemoteNotifications');
 const { sendGreetingEmail } = require('../utils/sendEmail');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+// const PORT = process.env.PORT || 3000;
 const SECRET_KEY = process.env.SECRET_KEY;
 
 // Middleware Usage
@@ -311,13 +311,13 @@ app.get('/health', (req, res) => {
 module.exports = app;
 
 // Gracefully handle process termination
-process.on("SIGINT", () => {
-  console.log("SIGINT received: Closing server...");
-  process.exit(0); // Exit the process
-});
+// process.on("SIGINT", () => {
+//   console.log("SIGINT received: Closing server...");
+//   process.exit(0); // Exit the process
+// });
 
-process.on("SIGTERM", () => {
-  console.log("SIGTERM received: Closing server...");
-  process.exit(0); // Exit the process
-});
+// process.on("SIGTERM", () => {
+//   console.log("SIGTERM received: Closing server...");
+//   process.exit(0); // Exit the process
+// });
 
