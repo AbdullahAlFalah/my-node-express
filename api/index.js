@@ -44,6 +44,15 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cors()); // Enable CORS for all routes
 
+// Root route to confirm backend is live
+app.get('/', (req, res) => {
+  res.status(200).json({
+    ServerNote: 'Welcome to My Express API!',
+    status: 'Online',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Custom Routes Usage
 app.use('/api', purchaseRoutes);
 app.use(addFundsRoutes);
