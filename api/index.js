@@ -10,6 +10,8 @@ require('dotenv').config();
 // require('../scheduledjobs/sendScheduledNotifications');
 
 const express = require('express');
+const app = express();
+
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -34,7 +36,6 @@ const sendRemoteNotifications = require('../routes/sendRemoteNotifications');
 // Imported custom utility functions
 const { sendGreetingEmail } = require('../utils/sendEmail');
 
-const app = express();
 // const PORT = process.env.PORT || 3000;
 const SECRET_KEY = process.env.SECRET_KEY;
 
