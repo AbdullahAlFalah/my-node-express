@@ -15,7 +15,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ message: 'Export successful', fileId });
     }
 
-    if (job === 'hourly' || job === 'weekly') {
+    if (job === 'daily' || job === 'weekly') {
       const result = await runVercelNotificationJob(job);
       return res.status(200).json({ message: `Notifications (${job}) sent`, result });
     }

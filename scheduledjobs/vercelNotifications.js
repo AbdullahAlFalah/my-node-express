@@ -4,7 +4,7 @@ const { runDbQuery } = require('../utils/mySqlQuery');
 
 async function runVercelNotificationJob(type) {
     const isWeekly = type === 'weekly';
-    const title = isWeekly ? 'Weekly Report' : 'Friendly Reminder';
+    const title = isWeekly ? 'Weekly Report' : 'Daily Reminder';
     const body = isWeekly ? 'This is your weekly report!' : 'This is your friendly notification!';
 
     try {

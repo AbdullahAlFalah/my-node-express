@@ -3,8 +3,8 @@
   "rewrites": [{ "source": "/(.*)", "destination": "/api/index.js" }],
   "crons": [
     {
-      "path": "/api/cron-handler?job=hourly",
-      "schedule": "0 */6 * * *"
+      "path": "/api/cron-handler?job=daily",
+      "schedule": "0 16 * * *"
     },
     {
       "path": "/api/cron-handler?job=weekly",
