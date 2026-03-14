@@ -13,10 +13,8 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
-// Comment out these when on Vercel, as they are not needed there and can cause issues with connection pooling in serverless environments.
-// const pgsqlpool = require('./DifferentDatabases/postgreSQL');
-// const mysqlpool = require('./DifferentDatabases/MySQL');
-
+const pgsqlpool = require('./DifferentDatabases/postgreSQL');
+const mysqlpool = require('./DifferentDatabases/MySQL');
 const { runDbQuery } = require('./utils/mySqlQuery');
 const { runPgQuery } = require('./utils/pgQuery');
 

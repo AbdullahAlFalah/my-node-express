@@ -1,4 +1,6 @@
-const pgsqlpool = require('../DifferentDatabases/postgreSQL');
+// For Vercel deployment, we switch to a pure JavaScript PostgreSQL client that doesn't require native bindings, ensuring compatibility and ease of deployment.
+// const pgsqlpool = require('../DifferentDatabases/postgreSQL');
+const pgsqlpool = require('../DifferentDatabases/vercelPostgreSQL');
 
 async function runPgQuery(query, params = []) {
   const start = Date.now();
