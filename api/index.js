@@ -1,11 +1,13 @@
-// index.js: Main entry point for the Node.js application on AWS.
+// api/index.js: Main entry point for the Node.js application on Vercel. 
 
 // Make sure .env is loaded
 require('dotenv').config();
 
 // Imported scheduled jobs
-require('./scheduledjobs/exportPurchases');
-require('./scheduledjobs/sendScheduledNotifications');
+// DELETE OR COMMENT THESE OUT in api/index.js since Vercel runs the serverless function on demand and does not support long-running processes like cron jobs.
+// Instead, I should deploy scheduled jobs as separate serverless functions or use an external scheduler like AWS CloudWatch Events, Google Cloud Scheduler, or a third-party service like cron-job.org to trigger these functions at the desired intervals.
+// require('../scheduledjobs/exportPurchases');
+// require('../scheduledjobs/sendScheduledNotifications');
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -13,24 +15,24 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
-const pgsqlpool = require('./DifferentDatabases/postgreSQL');
-const mysqlpool = require('./DifferentDatabases/MySQL');
-const { runDbQuery } = require('./utils/mySqlQuery');
-const { runPgQuery } = require('./utils/pgQuery');
+const pgsqlpool = require('../DifferentDatabases/postgreSQL');
+const mysqlpool = require('../DifferentDatabases/MySQL');
+const { runDbQuery } = require('../utils/mySqlQuery');
+const { runPgQuery } = require('../utils/pgQuery');
 
 // Imported custom middlewares
-const authenticateToken = require('./middleware/authenticateToken');
+const authenticateToken = require('../middleware/authenticateToken');
 
 // Imported custom routes
-const purchaseRoutes = require('./routes/purchase');
-const addFundsRoutes = require('./routes/addFunds');
-const getWalletRoutes = require('./routes/getWallet');
-const sendReward = require('./routes/sendReward');
-const upgradeBackground = require('./routes/upgradeBackground');
-const sendRemoteNotifications = require('./routes/sendRemoteNotifications');
+const purchaseRoutes = require('../routes/purchase');
+const addFundsRoutes = require('../routes/addFunds');
+const getWalletRoutes = require('../routes/getWallet');
+const sendReward = require('../routes/sendReward');
+const upgradeBackground = require('../routes/upgradeBackground');
+const sendRemoteNotifications = require('../routes/sendRemoteNotifications');
 
 // Imported custom utility functions
-const { sendGreetingEmail } = require('./utils/sendEmail');
+const { sendGreetingEmail } = require('../utils/sendEmail');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -300,9 +302,13 @@ app.get('/health', (req, res) => {
 });
 
 // Start the server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// REMOVE or COMMENT OUT the app.listen block when deploying to Vercel, as Vercel handles the server startup automatically.
+// app.listen(PORT, '0.0.0.0', () => {
+//   console.log(`Server is running on port ${PORT}`);
+// });
+
+// Export the app for Vercel
+module.exports = app;
 
 // Gracefully handle process termination
 process.on("SIGINT", () => {

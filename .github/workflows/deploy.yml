@@ -1,4 +1,4 @@
-name: Deploy Node.js app to EC2 on push
+name: Deploy Node.js app to EC2 on push # disabled this workflow from GitHub UI
 
 on:
   push:

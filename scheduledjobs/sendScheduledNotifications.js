@@ -39,7 +39,7 @@ async function sendToAllTokens(title, body) {
     }
 }
 
-// Scheduled job to send notifications to all users every hour
+// Scheduled job to send notifications to all users every 6 hours
 cron.schedule(Notification_CRON, async () => {
     // This runs at minute 0 of every 6 hours
     console.log('[CRON] Notification job started...');
