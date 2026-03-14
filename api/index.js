@@ -13,10 +13,10 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs'); // Swap bcrypt for bcryptjs. It is a pure JavaScript version that doesn't require compilation and works perfectly on Vercel.
 
-const pgsqlpool = require('../DifferentDatabases/postgreSQL');
-const mysqlpool = require('../DifferentDatabases/MySQL');
+const pgsqlpool = require('../DifferentDatabases/vercelPostgreSQL');
+const mysqlpool = require('../DifferentDatabases/vercelMySQL');
 const { runDbQuery } = require('../utils/mySqlQuery');
 const { runPgQuery } = require('../utils/pgQuery');
 
