@@ -1,36 +1,38 @@
 // index.js: Main entry point for the Node.js application on AWS.
+// Commented out all the requires so Vercel doesn't create any isses.
 
 // Make sure .env is loaded
-require('dotenv').config();
+// require('dotenv').config();
 
 // Imported scheduled jobs
-require('./scheduledjobs/exportPurchases');
-require('./scheduledjobs/sendScheduledNotifications');
+// Commented out due to missing mysql_ca.pem certificate file and token.json file in Serverless Vercel environment. These jobs will be run in a separate environment with the necessary credentials and certificates.
+// require('./scheduledjobs/exportPurchases');
+// require('./scheduledjobs/sendScheduledNotifications');
 
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
+// const express = require('express');
+// const bodyParser = require('body-parser');
+// const cors = require('cors');
+// const jwt = require('jsonwebtoken');
+// const bcrypt = require('bcrypt');
 
-const pgsqlpool = require('./DifferentDatabases/postgreSQL');
-const mysqlpool = require('./DifferentDatabases/MySQL');
-const { runDbQuery } = require('./utils/mySqlQuery');
-const { runPgQuery } = require('./utils/pgQuery');
+// const pgsqlpool = require('./DifferentDatabases/postgreSQL');
+// const mysqlpool = require('./DifferentDatabases/MySQL');
+// const { runDbQuery } = require('./utils/mySqlQuery');
+// const { runPgQuery } = require('./utils/pgQuery');
 
-// Imported custom middlewares
-const authenticateToken = require('./middleware/authenticateToken');
+// // Imported custom middlewares
+// const authenticateToken = require('./middleware/authenticateToken');
 
-// Imported custom routes
-const purchaseRoutes = require('./routes/purchase');
-const addFundsRoutes = require('./routes/addFunds');
-const getWalletRoutes = require('./routes/getWallet');
-const sendReward = require('./routes/sendReward');
-const upgradeBackground = require('./routes/upgradeBackground');
-const sendRemoteNotifications = require('./routes/sendRemoteNotifications');
+// // Imported custom routes
+// const purchaseRoutes = require('./routes/purchase');
+// const addFundsRoutes = require('./routes/addFunds');
+// const getWalletRoutes = require('./routes/getWallet');
+// const sendReward = require('./routes/sendReward');
+// const upgradeBackground = require('./routes/upgradeBackground');
+// const sendRemoteNotifications = require('./routes/sendRemoteNotifications');
 
-// Imported custom utility functions
-const { sendGreetingEmail } = require('./utils/sendEmail');
+// // Imported custom utility functions
+// const { sendGreetingEmail } = require('./utils/sendEmail');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
