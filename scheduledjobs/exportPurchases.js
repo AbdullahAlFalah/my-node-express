@@ -6,7 +6,8 @@ const { google } = require('googleapis');
 const { Readable } = require('stream');
 const cron = require('node-cron');
 const ExcelJS = require('exceljs');
-const mysqlpool = require('../DifferentDatabases/MySQL');
+// Commented out due to missing mysql_ca.pem certificate file in Serverless Vercel environment.
+// const mysqlpool = require('../DifferentDatabases/MySQL');
 const { sendExportNotifyEmail } = require('../utils/sendEmail');
 
 // Load your OAuth2 client credentials
