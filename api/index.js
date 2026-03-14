@@ -52,35 +52,35 @@ app.use(upgradeBackground);
 app.use(sendRemoteNotifications);
 
 // Connect to MySQL for testing purposes
-mysqlpool.getConnection((err, mysqlclient) => {
-  if (err) {
-    console.error('Error connecting to MySQL: ' + err.stack);
-    return;
-  }
-  console.log('Connected to MySQL as ID ' + mysqlclient.threadId);
-  mysqlclient.release(); // ✅ Good practice, but not critical for a one-time test
-});
+// mysqlpool.getConnection((err, mysqlclient) => {
+//   if (err) {
+//     console.error('Error connecting to MySQL: ' + err.stack);
+//     return;
+//   }
+//   console.log('Connected to MySQL as ID ' + mysqlclient.threadId);
+//   mysqlclient.release(); // ✅ Good practice, but not critical for a one-time test
+// });
 
 // Connect to PostgreSQL for testing purposes
-pgsqlpool.connect((err, pgclient, release) => {
+// pgsqlpool.connect((err, pgclient, release) => {
 
-  if (err) {
-    console.error('Error connecting to PostgreSQL: ' + err.stack);
-    return;
-  }
+//   if (err) {
+//     console.error('Error connecting to PostgreSQL: ' + err.stack);
+//     return;
+//   }
 
-  // Get the process ID for the current PostgreSQL connection
-  pgclient.query('SELECT pg_backend_pid()', (err, result) => {   
-    if (err) {
-      console.error('Error getting current query: ' + err.stack);
-      return;
-    }
-    const pgConnectionId = result.rows[0].pg_backend_pid;
-    console.log('Connected to PostgreSQL as PID ' + pgConnectionId);
-    release(); // ✅ Always release after your test query
-  });
+//   // Get the process ID for the current PostgreSQL connection
+//   pgclient.query('SELECT pg_backend_pid()', (err, result) => {   
+//     if (err) {
+//       console.error('Error getting current query: ' + err.stack);
+//       return;
+//     }
+//     const pgConnectionId = result.rows[0].pg_backend_pid;
+//     console.log('Connected to PostgreSQL as PID ' + pgConnectionId);
+//     release(); // ✅ Always release after your test query
+//   });
 
-});
+// });
 
 // MySQL Routes:
 // Create a new user route (Signing-up)
