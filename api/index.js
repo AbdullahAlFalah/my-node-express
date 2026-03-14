@@ -302,14 +302,14 @@ app.get('/health', (req, res) => {
   res.sendStatus(200); // Respond with HTTP 200 OK
 });
 
+// Export the app for Vercel
+module.exports = app;
+
 // Start the server
 // REMOVE or COMMENT OUT the app.listen block when deploying to Vercel, as Vercel handles the server startup automatically.
 // app.listen(PORT, '0.0.0.0', () => {
 //   console.log(`Server is running on port ${PORT}`);
 // });
-
-// Export the app for Vercel
-module.exports = app;
 
 // Gracefully handle process termination
 // process.on("SIGINT", () => {
