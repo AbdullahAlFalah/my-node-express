@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const mysqlpool = require('../DifferentDatabases/MySQL');
+// For Vercel deployment, we switch to a pure JavaScript MySQL client that doesn't require native bindings, ensuring compatibility and ease of deployment.
+// const mysqlpool = require('../DifferentDatabases/MySQL');
+const mysqlpool = require('../DifferentDatabases/vercelMySQL');
 const authenticateToken = require('../middleware/authenticateToken');
 const { runDbQuery } = require('../utils/mySqlQuery');
 

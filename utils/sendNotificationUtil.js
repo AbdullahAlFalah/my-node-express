@@ -1,5 +1,7 @@
 const axios = require('axios');
-const mysqlpool = require('../DifferentDatabases/MySQL');
+// For Vercel deployment, we switch to a pure JavaScript MySQL client that doesn't require native bindings, ensuring compatibility and ease of deployment.
+// const mysqlpool = require('../DifferentDatabases/MySQL');
+const mysqlpool = require('../DifferentDatabases/vercelMySQL');
 
 /**
  * Sends an Expo push notification to a user by email.
