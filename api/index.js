@@ -50,19 +50,27 @@ app.use(cors({
   credentials: true
 })); // Enable CORS for all routes
 
-// GLOBAL JSON FORCE MIDDLEWARE
 app.use((req, res, next) => {
-  // 1. Force the header for every response globally
-  res.setHeader('Content-Type', 'application/json');
+    const originalJson = res.json;
+    res.json = function (body) {
+        // Capture the status code you INTENDED to send (like 401)
+        const actualStatus = res.statusCode;
 
-  // 2. Intercept the 'send' and 'json' methods to ensure the header isn't dropped during error states (401, 500, etc.)
-  const originalJson = res.json;
-  res.json = function (body) {
-    res.setHeader('Content-Type', 'application/json');
-    return originalJson.call(this, body);
-  };
-
-  next();
+        // If it's an error (400+), force HTTP 200 so Vercel doesn't strip it
+        if (actualStatus >= 400) {
+            res.status(200); 
+            // Wrap the body to ensure 'success' and 'status' are always there
+            return originalJson.call(this, {
+                success: false,
+                originalStatus: actualStatus,
+                ...body
+            });
+        }
+        
+        // For successful requests, just add a success flag
+        return originalJson.call(this, { success: true, ...body });
+    };
+    next();
 });
 
 // Root route to confirm backend is live
