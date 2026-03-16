@@ -144,7 +144,7 @@ app.post(`/api/users/login`, async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password, user.password);      
     if (!isPasswordValid) { // user.password !== password can be used if password is not hashed
       console.log(`[AUTH] Invalid password attempt for: ${email}`); // ADD THIS FOR VERCEL LOGS
-      return res.status(401).json({ServerNote: 'Invalid password!'}); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
+      return res.status(200).json({ServerNote: 'Invalid password!'}); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
     }
 
     // Generate a JWT token
