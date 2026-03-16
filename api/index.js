@@ -42,7 +42,13 @@ const SECRET_KEY = process.env.SECRET_KEY;
 // Middleware Usage
 app.use(express.json());
 // app.use(bodyParser.json());
-app.use(cors()); // Enable CORS for all routes
+app.use(cors({
+  origin: '*', // Allows your Expo app to connect from any network
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'], // Explicitly expose headers
+  credentials: true
+})); // Enable CORS for all routes
 
 // Root route to confirm backend is live
 app.get('/', (req, res) => {
@@ -144,7 +150,7 @@ app.post(`/api/users/login`, async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password, user.password);      
     if (!isPasswordValid) { // user.password !== password can be used if password is not hashed
       console.log(`[AUTH] Invalid password attempt for: ${email}`); // ADD THIS FOR VERCEL LOGS
-      return res.status(200).json({ServerNote: 'Invalid password!'}); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
+      return res.status(401).json({ServerNote: 'Invalid password!'}); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
     }
 
     // Generate a JWT token
