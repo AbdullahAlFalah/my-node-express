@@ -22,9 +22,6 @@ const bcrypt = require('bcryptjs'); // Swap bcrypt for bcryptjs. It is a pure Ja
 const { runDbQuery } = require('../utils/mySqlQuery');
 const { runPgQuery } = require('../utils/pgQuery');
 
-// Imported custom middlewares
-const authenticateToken = require('../middleware/authenticateToken');
-
 // Imported custom routes
 const purchaseRoutes = require('../routes/purchase');
 const addFundsRoutes = require('../routes/addFunds');
@@ -47,31 +44,17 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Content-Length', 'ServerNote', 'X-Foo', 'X-Bar'], // Explicitly expose headers
-  credentials: true
+  credentials: false,
 })); // Enable CORS for all routes
 
+// Middleware to set Content-Type for all responses to application/json
 app.use((req, res, next) => {
-    const originalJson = res.json;
-    res.json = function (body) {
-        // Capture the status code you INTENDED to send (like 401)
-        const actualStatus = res.statusCode;
-
-        // If it's an error (400+), force HTTP 200 so Vercel doesn't strip it
-        if (actualStatus >= 400) {
-            res.status(200); 
-            // Wrap the body to ensure 'success' and 'status' are always there
-            return originalJson.call(this, {
-                success: false,
-                originalStatus: actualStatus,
-                ...body
-            });
-        }
-        
-        // For successful requests, just add a success flag
-        return originalJson.call(this, { success: true, ...body });
-    };
-    next();
+  res.setHeader('Content-Type', 'application/json');
+  next();
 });
+
+// Imported custom middlewares
+const authenticateToken = require('../middleware/authenticateToken');
 
 // Root route to confirm backend is live
 app.get('/', (req, res) => {
