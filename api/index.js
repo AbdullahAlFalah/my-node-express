@@ -50,6 +50,21 @@ app.use(cors({
   credentials: true
 })); // Enable CORS for all routes
 
+// GLOBAL JSON FORCE MIDDLEWARE
+app.use((req, res, next) => {
+  // 1. Force the header for every response globally
+  res.setHeader('Content-Type', 'application/json');
+
+  // 2. Intercept the 'send' and 'json' methods to ensure the header isn't dropped during error states (401, 500, etc.)
+  const originalJson = res.json;
+  res.json = function (body) {
+    res.setHeader('Content-Type', 'application/json');
+    return originalJson.call(this, body);
+  };
+
+  next();
+});
+
 // Root route to confirm backend is live
 app.get('/', (req, res) => {
   res.status(200).json({
