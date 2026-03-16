@@ -4,8 +4,8 @@ const { runDbQuery } = require('../utils/mySqlQuery');
 
 async function runVercelNotificationJob(type) {
     const isWeekly = type === 'weekly';
-    const title = isWeekly ? 'Weekly Report' : 'Daily Reminder';
-    const body = isWeekly ? 'This is your weekly report!' : 'This is your friendly notification!';
+    const title = isWeekly ? 'Weekly Reminder' : 'Daily Reminder';
+    const body = isWeekly ? 'This is your weekly reminder!' : 'This is your friendly notification!';
 
     try {
         const results = await runDbQuery('SELECT email, expoPushToken FROM user_push_tokens');

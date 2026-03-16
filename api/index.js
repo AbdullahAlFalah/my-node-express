@@ -41,7 +41,7 @@ const SECRET_KEY = process.env.SECRET_KEY;
 
 // Middleware Usage
 app.use(express.json());
-app.use(bodyParser.json());
+// app.use(bodyParser.json());
 app.use(cors()); // Enable CORS for all routes
 
 // Root route to confirm backend is live
@@ -143,6 +143,7 @@ app.post(`/api/users/login`, async (req, res) => {
     // Compare the provided password with the hashed password in the database
     const isPasswordValid = await bcrypt.compare(password, user.password);      
     if (!isPasswordValid) { // user.password !== password can be used if password is not hashed
+      console.log(`[AUTH] Invalid password attempt for: ${email}`); // ADD THIS FOR VERCEL LOGS
       return res.status(401).json({ServerNote: 'Invalid password!'}); // 401 Unauthorized: The request has not been applied because it lacks valid authentication credentials for the target resource.
     }
 
