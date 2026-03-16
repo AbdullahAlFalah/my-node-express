@@ -46,7 +46,7 @@ app.use(cors({
   origin: '*', // Allows your Expo app to connect from any network
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'], // Explicitly expose headers
+  exposedHeaders: ['Content-Length', 'ServerNote', 'X-Foo', 'X-Bar'], // Explicitly expose headers
   credentials: true
 })); // Enable CORS for all routes
 
