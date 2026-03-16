@@ -11,9 +11,37 @@ require('dotenv').config();
 
 const express = require('express');
 const app = express();
-
 const bodyParser = require('body-parser');
 const cors = require('cors');
+
+// Middleware Usage
+app.use(express.json());
+// app.use(bodyParser.json());
+
+app.use((req, res, next) => {
+  // Manually set CORS headers for every request to ensure errors aren't blocked
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  // Immediately handle preflight OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200).end(); // Respond to preflight requests right away
+  }
+  next();
+});
+
+app.use(cors({
+  origin: '*', // Allows your Expo app to connect from any network
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Length', 'ServerNote', 'X-Foo', 'X-Bar'], // Explicitly expose headers
+  credentials: false,
+})); // Enable CORS for all routes
+
+// Imported custom middlewares
+const authenticateToken = require('../middleware/authenticateToken');
+
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs'); // Swap bcrypt for bcryptjs. It is a pure JavaScript version that doesn't require compilation and works perfectly on Vercel.
 
@@ -35,26 +63,6 @@ const { sendGreetingEmail } = require('../utils/sendEmail');
 
 // const PORT = process.env.PORT || 3000;
 const SECRET_KEY = process.env.SECRET_KEY;
-
-// Middleware Usage
-app.use(express.json());
-// app.use(bodyParser.json());
-app.use(cors({
-  origin: '*', // Allows your Expo app to connect from any network
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Content-Length', 'ServerNote', 'X-Foo', 'X-Bar'], // Explicitly expose headers
-  credentials: false,
-})); // Enable CORS for all routes
-
-// Middleware to set Content-Type for all responses to application/json
-app.use((req, res, next) => {
-  res.setHeader('Content-Type', 'application/json');
-  next();
-});
-
-// Imported custom middlewares
-const authenticateToken = require('../middleware/authenticateToken');
 
 // Root route to confirm backend is live
 app.get('/', (req, res) => {
