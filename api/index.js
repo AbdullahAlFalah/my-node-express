@@ -36,7 +36,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Content-Length', 'ServerNote', 'X-Foo', 'X-Bar'], // Explicitly expose headers
-  credentials: false,
+  credentials: true, // Set to true to match the Vercel config if your Expo app sends credentials (cookies, authorization headers) with requests. Adjust as needed.
 })); // Enable CORS for all routes
 
 // Imported custom middlewares
