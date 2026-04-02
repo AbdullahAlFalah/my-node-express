@@ -86,7 +86,7 @@ async function exportPurchasesToDrive(purchases) {
 
     // Generate Excel buffer
     const buffer = await workbook.xlsx.writeBuffer();
-    const fileName = `purchases_${Date.now()}.xlsx`;
+    const fileName = `purchases_${new Date().toISOString().split('T')[0]}.xlsx`;
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
 
     if (!folderId) {
