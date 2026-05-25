@@ -16,7 +16,7 @@ async function runVercelNotificationJob(type) {
             if (!row.expoPushToken) continue;
             const result = await sendExpoNotificationByToken(row.expoPushToken, title, body);
             if (!result.success) allSuccess = false;
-            summary.push({ email: row.email, success: result.success });
+            summary.push({ email: row.email, success: result.success, message: result.message });
         }
 
         // If it's the weekly job, send the admin email

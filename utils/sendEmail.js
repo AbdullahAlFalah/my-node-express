@@ -3,10 +3,25 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
+    type: 'OAuth2',
     user: process.env.EMAIL_ADMIN, // Admin Gmail address
-    pass: process.env.EMAIL_PASSWORD  // Admin Gmail app password
+    // pass: process.env.EMAIL_PASSWORD  // Admin Gmail app password
+    clientId: process.env.GMAIL_CLIENT_ID,
+    clientSecret: process.env.GMAIL_CLIENT_SECRET,
+    refreshToken: process.env.GMAIL_REFRESH_TOKEN,
   }
 });
+
+// Create a transporter using Resend's SMTP settings
+// const transporter = nodemailer.createTransport({
+//   host: 'smtp.resend.com',
+//   port: 465,
+//   secure: true, // true for 465
+//   auth: {
+//     user: 'resend', // Always literally 'resend'
+//     pass: process.env.RESEND_API_KEY // My Resend API key
+//   }
+// });
 
 // Greeting email for new users
 async function sendGreetingEmail(to, username) {
@@ -57,7 +72,7 @@ async function sendNotificationResultToAdmin(summary) {
     to: process.env.EMAIL_ADMIN,
     subject: `Push Notification Results for Summary`,
     text: summary.map(item =>
-      `Email: ${item.email}\nSuccess: ${item.success}\nMessage: ${item.message}\n`
+      `Email: ${item.email}\nSuccess: ${item.success}\nMessage: ${item.message || 'Delivered notification successfully'}\n`
     ).join('\n------------------------\n')
   };
   return transporter.sendMail(mailOptions);
