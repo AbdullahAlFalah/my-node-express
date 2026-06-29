@@ -13,7 +13,7 @@ const mysqlpool = require('../DifferentDatabases/vercelMySQL');
 async function sendExpoNotification(email, title, body) {
     try {
         const results = await runDbQuery(
-            'SELECT expoPushToken FROM user_push_tokens WHERE email = ?',
+            'SELECT expoPushToken FROM user_push_tokens WHERE email = ? ORDER BY updatedAt DESC LIMIT 1',
             [email]
         );
 
@@ -53,6 +53,18 @@ async function sendExpoNotificationByToken(token, title, body) {
         );
         const status = response.data?.data?.status;
         const success = status === 'ok';
+
+        // 🚨 THE DELETE LOGIC GOES HERE:
+        const details = response.data?.data?.details;
+        if (details && details.error === 'DeviceNotRegistered') {
+            console.warn(`[Cleanup] Token has expired or app was uninstalled. Removing from DB: ${token}`);
+            
+            // Execute the delete query synchronously using the specific token string
+            await runDbQuery('DELETE FROM user_push_tokens WHERE expoPushToken = ?', [token]);
+            
+            return { success: false, message: 'DeviceNotRegistered: Token removed from database' };
+        }
+
         return { success, message: success ? 'Sent notification successfully' : 'Expo error', data: response.data };
     } catch (error) {
         console.error('Failed to send notification:', error);

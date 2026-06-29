@@ -21,7 +21,14 @@ async function runVercelNotificationJob(type) {
 
         // If it's the weekly job, send the admin email
         if (isWeekly) {
-            await sendNotificationResultToAdmin(summary);
+            try {
+                console.log("Attempting to send weekly admin summary email...");
+                await sendNotificationResultToAdmin(summary);
+                console.log("Admin summary email sent successfully!");
+            } catch (emailError) {
+                // Log the failure to Vercel Logs, but don't crash the function execution!
+                console.error("Weekly admin email failed to send:", emailError.message);
+            }
         }
 
         return { allSuccess, count: results.length };
