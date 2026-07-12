@@ -2,6 +2,10 @@ const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
+  pool: true, // Use pooled connections for better performance; Keeps the connection alive for multiple emails
+  maxConnections: 3, // Limit simultaneous open channels
+  socketTimeout: 10000, // Close frozen connections after 10 seconds
+  connectionTimeout: 10000,
   auth: {
     type: 'OAuth2',
     user: process.env.EMAIL_ADMIN, // Admin Gmail address

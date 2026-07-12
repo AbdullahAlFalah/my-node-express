@@ -51,11 +51,14 @@ async function sendExpoNotificationByToken(token, title, body) {
                 }
             }
         );
-        const status = response.data?.data?.status;
+
+        // Get the direct ticket result object from the array
+        const ticket = response.data?.data?.[0];
+        const status = ticket?.status;
         const success = status === 'ok';
 
         // 🚨 THE DELETE LOGIC GOES HERE:
-        const details = response.data?.data?.details;
+        const details = ticket?.details;
         if (details && details.error === 'DeviceNotRegistered') {
             console.warn(`[Cleanup] Token has expired or app was uninstalled. Removing from DB: ${token}`);
             
