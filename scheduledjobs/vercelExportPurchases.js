@@ -52,7 +52,7 @@ async function runVercelExport() {
         ];
 
         results.forEach(purchase => {
-          worksheet.addRows({
+          worksheet.addRow({
             ...purchase,
             items: JSON.stringify(purchase.items), // Format JSON items as string
             createdAt: new Date(purchase.createdAt).toLocaleString(),

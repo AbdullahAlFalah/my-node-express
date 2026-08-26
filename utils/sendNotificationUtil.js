@@ -59,16 +59,29 @@ async function sendExpoNotificationByToken(token, title, body) {
 
         // 🚨 THE DELETE LOGIC GOES HERE:
         const details = ticket?.details;
-        if (details && details.error === 'DeviceNotRegistered') {
+        const rawMessage = ticket?.message || ''; // Capture any readable message Expo gives us
+        if (
+            ( details && details.error === 'DeviceNotRegistered') ||
+            rawMessage.includes('not a registered push notification recipient') ||
+            rawMessage.includes('is not a valid')
+        ) {
             console.warn(`[Cleanup] Token has expired or app was uninstalled. Removing from DB: ${token}`);
             
             // Execute the delete query synchronously using the specific token string
             await runDbQuery('DELETE FROM user_push_tokens WHERE expoPushToken = ?', [token]);
             
-            return { success: false, message: 'DeviceNotRegistered: Token removed from database' };
+            return {
+                success: false,
+                message: 'DeviceNotRegistered: Token removed from database',
+                data: response.data
+            };
         }
 
-        return { success, message: success ? 'Sent notification successfully' : 'Expo error', data: response.data };
+        return {
+            success,
+            message: success ? 'Sent notification successfully' : (rawMessage || 'Expo error'),
+            data: response.data
+        };
     } catch (error) {
         console.error('Failed to send notification:', error);
         return { success: false, message: `Failed to send notification: ${error}` };
