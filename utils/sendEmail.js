@@ -64,7 +64,7 @@ async function sendPushNotificationRegistrationEmail(email) {
     from: process.env.EMAIL_ADMIN,
     to: email,
     subject: 'Push Notification Registration Successful',
-    text: `Hello,\n\nYou have successfully registered for push notifications by logging in.\n\nYou will now receive push notifications."\n\nBest regards,\nYour Backend System`
+    text: `Hello,\n\nYou have successfully registered for push notifications by logging in.\n\nYou will now receive push notifications.\n\nBest regards,\nAbdullah Al-Falah's Backend System`
   };
   return transporter.sendMail(mailOptions);
 }
